@@ -1,0 +1,8 @@
+prompt.md
+table.md
+.venv/
+__pycache__/
+.pytest_cache/
+experiments/*/results/*.csv
+experiments/*/results/*.json
+experiments/*/figures/.matplotlib-cache/

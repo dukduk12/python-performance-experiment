@@ -1,0 +1,18 @@
+[project]
+name = "python-performance-experiments"
+version = "0.1.0"
+description = "Experimental benchmarks exploring Python performance, memory access patterns, CPU cache locality, and concurrency."
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "matplotlib>=3.10.0",
+    "numpy>=2.5.1",
+    "pandas>=2.3.0",
+]
+
+[dependency-groups]
+dev = [
+    "mypy>=2.2.0",
+    "pytest>=9.1.1",
+    "ruff>=0.15.21",
+]

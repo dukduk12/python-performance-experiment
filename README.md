@@ -2,12 +2,8 @@
 
 Small, reproducible experiments for understanding Python performance.
 
-| Experiment                                                  | Topic                                                       | Status   |
-| ----------------------------------------------------------- | ----------------------------------------------------------- | -------- |
-| [Experiment 01](experiments/exp01_list_traversal/README.md) | Row-major vs. column-major traversal of nested Python lists | Complete |
-| [Experiment 02](experiments/exp02_numpy_memory_layout/README.md) | NumPy C-order vs. F-order memory layout                  | Complete |
-
-```bash
-uv sync --dev
-uv run python experiments/exp01_list_traversal/benchmark.py
-```
+| Experiment                                                       | Topic                        | Summary                                                                         |
+| ---------------------------------------------------------------- | ---------------------------- | ------------------------------------------------------------------------------- |
+| [Experiment 01](experiments/exp01_list_traversal/README.md)      | Python Nested List Traversal | Compares row-first and column-first traversal of nested Python lists.           |
+| [Experiment 02](experiments/exp02_numpy_memory_layout/README.md) | NumPy Memory Layout          | Measures how C/F memory order interacts with row-first and column-first access. |
+| [Experiment 03](experiments/exp03_python_vs_numba/README.md)     | Pure Python vs Numba         | Shows how interpreter overhead masks traversal-order and memory-locality costs. |

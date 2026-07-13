@@ -3,10 +3,11 @@ name = "python-performance-experiments"
 version = "0.1.0"
 description = "Experimental benchmarks exploring Python performance, memory access patterns, CPU cache locality, and concurrency."
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.13,<3.15"
 dependencies = [
     "matplotlib>=3.10.0",
-    "numpy>=2.5.1",
+    "numba>=0.64.0",
+    "numpy>=2.3.0,<2.5",
     "pandas>=2.3.0",
 ]
 

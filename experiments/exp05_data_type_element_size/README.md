@@ -65,13 +65,13 @@ Memory should scale exactly with item size. `int32` and `float32`, and likewise 
 
 Reference run on 2026-07-15 KST; values are medians of 11 repetitions.
 
-| Dtype | Item size | Array memory | Median | Throughput | Effective bandwidth |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| `int8` | 1 B | 7.63 MiB | 0.560 ms | 14,275.5 M elem/s | 26.59 GiB/s |
-| `int32` | 4 B | 30.52 MiB | 2.211 ms | 3,618.6 M elem/s | 26.96 GiB/s |
-| `int64` | 8 B | 61.04 MiB | 4.434 ms | 1,804.4 M elem/s | 26.89 GiB/s |
-| `float32` | 4 B | 30.52 MiB | 2.206 ms | 3,625.8 M elem/s | 27.01 GiB/s |
-| `float64` | 8 B | 61.04 MiB | 4.331 ms | 1,847.1 M elem/s | 27.52 GiB/s |
+| Dtype     | Item size | Array memory |   Median |        Throughput | Effective bandwidth |
+| --------- | --------: | -----------: | -------: | ----------------: | ------------------: |
+| `int8`    |       1 B |     7.63 MiB | 0.560 ms | 14,275.5 M elem/s |         26.59 GiB/s |
+| `int32`   |       4 B |    30.52 MiB | 2.211 ms |  3,618.6 M elem/s |         26.96 GiB/s |
+| `int64`   |       8 B |    61.04 MiB | 4.434 ms |  1,804.4 M elem/s |         26.89 GiB/s |
+| `float32` |       4 B |    30.52 MiB | 2.206 ms |  3,625.8 M elem/s |         27.01 GiB/s |
+| `float64` |       8 B |    61.04 MiB | 4.331 ms |  1,847.1 M elem/s |         27.52 GiB/s |
 
 ### 10. Discussion
 
@@ -88,18 +88,6 @@ For a fixed count of contiguous elements, smaller dtypes reduce memory use and i
 The experiment uses one machine, one NumPy version, one array length, and a contiguous copy workload. `np.copyto` may use platform-specific optimized kernels, and effective bandwidth is a derived traffic estimate rather than a hardware-counter measurement. Cache state, CPU frequency, thermals, page faults, and background scheduling vary. The destination write policy and cache reuse may also affect traffic beyond the simple read-plus-write model.
 
 Repeating several element counts and machines would show whether the pattern holds across cache and main-memory regimes. Hardware counters and controlled affinity could separate cache behavior from memory bandwidth, but those are outside this experiment's core comparison.
-
-Suggested commit message: `feat: add Experiment 05 dtype element-size benchmark`
-
-Suggested folder structure (implemented):
-
-```text
-experiments/exp05_data_type_element_size/
-├── README.md
-├── benchmark.py
-├── figures/dtype_element_size.png
-└── results/                 # generated CSV and metadata (gitignored)
-```
 
 ---
 
@@ -139,13 +127,13 @@ NumPy 배열은 고정 너비 원소를 연속 메모리에 저장한다. 원소
 
 2026-07-15 KST 기준 실행이며 조건별 11회 측정의 중앙값이다.
 
-| Dtype | 원소 크기 | 배열 메모리 | 중앙값 | 처리량 | 유효 대역폭 |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| `int8` | 1 B | 7.63 MiB | 0.560 ms | 14,275.5 M elem/s | 26.59 GiB/s |
-| `int32` | 4 B | 30.52 MiB | 2.211 ms | 3,618.6 M elem/s | 26.96 GiB/s |
-| `int64` | 8 B | 61.04 MiB | 4.434 ms | 1,804.4 M elem/s | 26.89 GiB/s |
-| `float32` | 4 B | 30.52 MiB | 2.206 ms | 3,625.8 M elem/s | 27.01 GiB/s |
-| `float64` | 8 B | 61.04 MiB | 4.331 ms | 1,847.1 M elem/s | 27.52 GiB/s |
+| Dtype     | 원소 크기 | 배열 메모리 |   중앙값 |            처리량 | 유효 대역폭 |
+| --------- | --------: | ----------: | -------: | ----------------: | ----------: |
+| `int8`    |       1 B |    7.63 MiB | 0.560 ms | 14,275.5 M elem/s | 26.59 GiB/s |
+| `int32`   |       4 B |   30.52 MiB | 2.211 ms |  3,618.6 M elem/s | 26.96 GiB/s |
+| `int64`   |       8 B |   61.04 MiB | 4.434 ms |  1,804.4 M elem/s | 26.89 GiB/s |
+| `float32` |       4 B |   30.52 MiB | 2.206 ms |  3,625.8 M elem/s | 27.01 GiB/s |
+| `float64` |       8 B |   61.04 MiB | 4.331 ms |  1,847.1 M elem/s | 27.52 GiB/s |
 
 ### 7. 논의와 결론
 
@@ -158,5 +146,3 @@ NumPy 배열은 고정 너비 원소를 연속 메모리에 저장한다. 원소
 한 대의 컴퓨터, 하나의 NumPy 버전, 하나의 원소 수와 연속 복사만 사용했다. `np.copyto`는 플랫폼별 최적화 커널을 사용할 수 있고 유효 대역폭은 하드웨어 측정값이 아니라 읽기+쓰기 바이트로 계산한 값이다. 캐시 상태, CPU 주파수·발열, 페이지 폴트, 백그라운드 작업과 destination 쓰기 정책도 결과에 영향을 줄 수 있다.
 
 여러 원소 수와 컴퓨터에서 반복하면 캐시와 주 메모리 구간에서도 같은 경향인지 확인할 수 있다. 하드웨어 카운터와 CPU affinity 통제는 캐시와 대역폭 효과를 더 잘 구분할 수 있다.
-
-추천 커밋 메시지: `feat: add Experiment 05 dtype element-size benchmark`

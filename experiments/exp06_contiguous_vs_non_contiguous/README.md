@@ -62,17 +62,17 @@ The contiguous condition should have the lowest median. Both views may be slower
 
 ### 9. Results
 
-Reference run on 2026-07-16 KST; values are medians of 11 repetitions.
+Reference run on 2026-07-17 KST; values are medians of 11 repetitions.
 
 | Condition | Strides (bytes) | C contiguous | F contiguous | Median | Throughput | Slowdown |
 | --- | ---: | :---: | :---: | ---: | ---: | ---: |
-| Contiguous | `(32000, 8)` | Yes | No | 6.048 ms | 1,322.8 M elem/s | 1.00× |
-| Sliced view | `(64000, 16)` | No | No | 13.196 ms | 606.2 M elem/s | 2.18× |
-| Transposed view | `(8, 16000)` | No | Yes | 89.268 ms | 89.6 M elem/s | 14.76× |
+| Contiguous | `(32000, 8)` | Yes | No | 4.664 ms | 1,715.2 M elem/s | 1.00× |
+| Sliced view | `(64000, 16)` | No | No | 11.535 ms | 693.6 M elem/s | 2.47× |
+| Transposed view | `(8, 16000)` | No | Yes | 56.612 ms | 141.3 M elem/s | 12.14× |
 
 ### 10. Discussion
 
-The result supports the hypothesis on this system. The sliced view took about 2.18 times as long as the C-contiguous source. It exposes the same logical elements but has a 16-byte inner stride, so useful reads are separated by unused elements. The transposed view was F-contiguous rather than non-contiguous in both senses, yet it was 14.76 times slower when copied into a C-contiguous destination: the source's unit-stride axis and destination's unit-stride axis do not match.
+The result supports the hypothesis on this system. The sliced view took about 2.47 times as long as the C-contiguous source. It exposes the same logical elements but has a 16-byte inner stride, so useful reads are separated by unused elements. The transposed view was F-contiguous rather than non-contiguous in both senses, yet it was 12.14 times slower when copied into a C-contiguous destination: the source's unit-stride axis and destination's unit-stride axis do not match.
 
 Therefore, a single “contiguous” label is insufficient. C/F order and the compatibility of source and destination traversal axes matter. These timings do not directly measure cache misses, so the stride-based explanation remains an interpretation rather than hardware-counter proof.
 
@@ -139,17 +139,17 @@ NumPy view는 데이터를 복사하지 않고 shape와 stride를 바꿀 수 있
 
 ### 6. 결과
 
-2026-07-16 KST 기준 실행이며 조건별 11회 측정의 중앙값이다.
+2026-07-17 KST 기준 실행이며 조건별 11회 측정의 중앙값이다.
 
 | 조건 | Strides (bytes) | C 연속 | F 연속 | 중앙값 | 처리량 | Slowdown |
 | --- | ---: | :---: | :---: | ---: | ---: | ---: |
-| Contiguous | `(32000, 8)` | 예 | 아니요 | 6.048 ms | 1,322.8 M elem/s | 1.00× |
-| Sliced view | `(64000, 16)` | 아니요 | 아니요 | 13.196 ms | 606.2 M elem/s | 2.18× |
-| Transposed view | `(8, 16000)` | 아니요 | 예 | 89.268 ms | 89.6 M elem/s | 14.76× |
+| Contiguous | `(32000, 8)` | 예 | 아니요 | 4.664 ms | 1,715.2 M elem/s | 1.00× |
+| Sliced view | `(64000, 16)` | 아니요 | 아니요 | 11.535 ms | 693.6 M elem/s | 2.47× |
+| Transposed view | `(8, 16000)` | 아니요 | 예 | 56.612 ms | 141.3 M elem/s | 12.14× |
 
 ### 7. 논의와 결론
 
-이 환경의 결과는 가설을 지지한다. 슬라이스 view는 C-contiguous source보다 약 2.18배 오래 걸렸다. 논리 원소 수는 같지만 안쪽 stride가 16바이트여서 사용하지 않는 원소 사이를 건너뛴다. 전치 view는 F-contiguous이지만 C-contiguous destination과 연속 축이 일치하지 않아 14.76배 오래 걸렸다. 따라서 단순한 연속/비연속 여부뿐 아니라 C/F 순서와 source/destination의 순회 축 호환성이 중요하다. 다만 cache miss를 직접 측정하지 않았으므로 stride에 따른 설명은 하드웨어 카운터로 입증된 결론은 아니다.
+이 환경의 결과는 가설을 지지한다. 슬라이스 view는 C-contiguous source보다 약 2.47배 오래 걸렸다. 논리 원소 수는 같지만 안쪽 stride가 16바이트여서 사용하지 않는 원소 사이를 건너뛴다. 전치 view는 F-contiguous이지만 C-contiguous destination과 연속 축이 일치하지 않아 12.14배 오래 걸렸다. 따라서 단순한 연속/비연속 여부뿐 아니라 C/F 순서와 source/destination의 순회 축 호환성이 중요하다. 다만 cache miss를 직접 측정하지 않았으므로 stride에 따른 설명은 하드웨어 카운터로 입증된 결론은 아니다.
 
 ### 8. 타당성 위협과 향후 작업
 

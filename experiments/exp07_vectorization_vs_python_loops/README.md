@@ -71,10 +71,10 @@ NumPy vectorization should have a lower median execution time and higher through
 
 Reference run on 2026-07-18 KST; times are medians of 11 repetitions.
 
-| Method | Median time | Throughput | Speedup | Peak traced memory |
-| --- | ---: | ---: | ---: | ---: |
-| Python loop | 74.760 ms | 13.38 M elem/s | 1.00× | 30.52 MiB |
-| NumPy vectorized | 13.986 ms | 71.50 M elem/s | 5.35× | 22.89 MiB |
+| Method           | Median time |     Throughput | Speedup | Peak traced memory |
+| ---------------- | ----------: | -------------: | ------: | -----------------: |
+| Python loop      |   74.760 ms | 13.38 M elem/s |   1.00× |          30.52 MiB |
+| NumPy vectorized |   13.986 ms | 71.50 M elem/s |   5.35× |          22.89 MiB |
 
 ### 10. Discussion
 
@@ -95,23 +95,6 @@ The benchmark covers one machine, input size, dtype, and expression. Python and 
 `tracemalloc` reports the peak traceable allocation exposed by the Python allocator and NumPy during each kernel. It is not the process's total resident set size and may not include every native allocation. Memory is measured only once per method, so it does not provide a distribution comparable to the timing data.
 
 Future work could measure several input sizes to locate the crossover point, compare more complex expressions, and test in-place NumPy implementations. Those extensions would help separate the effects of array allocation and computation intensity.
-
-### 13. Suggested Commit Message
-
-`feat: add Experiment 07 vectorization benchmark`
-
-### 14. Suggested Folder Structure
-
-```text
-experiments/exp07_vectorization_vs_python_loops/
-├── README.md
-├── benchmark.py
-├── figures/vectorization.png
-└── results/
-    ├── metadata.json
-    ├── raw.csv
-    └── summary.csv
-```
 
 ---
 
@@ -153,10 +136,10 @@ Python 반복문은 원소마다 바이트코드와 Python 객체 연산을 실�
 
 2026-07-18 KST 기준 실행이며 시간은 조건별 11회 측정의 중앙값이다.
 
-| 방법 | 중앙 실행 시간 | 처리량 | Speedup | Peak traced memory |
-| --- | ---: | ---: | ---: | ---: |
-| Python loop | 74.760 ms | 13.38 M elem/s | 1.00× | 30.52 MiB |
-| NumPy vectorized | 13.986 ms | 71.50 M elem/s | 5.35× | 22.89 MiB |
+| 방법             | 중앙 실행 시간 |         처리량 | Speedup | Peak traced memory |
+| ---------------- | -------------: | -------------: | ------: | -----------------: |
+| Python loop      |      74.760 ms | 13.38 M elem/s |   1.00× |          30.52 MiB |
+| NumPy vectorized |      13.986 ms | 71.50 M elem/s |   5.35× |          22.89 MiB |
 
 ### 7. 논의와 결론
 

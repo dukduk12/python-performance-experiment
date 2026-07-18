@@ -10,3 +10,4 @@ Small, reproducible experiments for understanding Python performance.
 | [Experiment 04](experiments/exp04_array_size_scaling/README.md)  | Array Size Scaling           | Measures how array growth changes traversal throughput and access-order cost.   |
 | [Experiment 05](experiments/exp05_data_type_element_size/README.md) | Data Type and Element Size | Measures how NumPy element width changes memory use and contiguous-copy throughput. |
 | [Experiment 06](experiments/exp06_contiguous_vs_non_contiguous/README.md) | Contiguous vs Non-Contiguous Arrays | Compares copy cost, strides, and contiguity flags for contiguous arrays and sliced/transposed views. |
+| [Experiment 07](experiments/exp07_vectorization_vs_python_loops/README.md) | Vectorization vs Python Loops | Compares execution time, speedup, and peak traced memory for Python loops and NumPy vectorization. |

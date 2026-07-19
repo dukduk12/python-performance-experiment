@@ -9,6 +9,7 @@ dependencies = [
     "numba>=0.64.0",
     "numpy>=2.3.0,<2.5",
     "pandas>=2.3.0",
+    "psutil>=7.0.0",
 ]
 
 [dependency-groups]
@@ -16,4 +17,5 @@ dev = [
     "mypy>=2.2.0",
     "pytest>=9.1.1",
     "ruff>=0.15.21",
+    "types-psutil>=7.0.0",
 ]

@@ -22,7 +22,7 @@
     <td><strong>Study type</strong></td>
     <td>Controlled performance experiments</td>
     <td><strong>Implemented</strong></td>
-    <td>8 experiments</td>
+    <td>9 experiments</td>
   </tr>
   <tr>
     <td><strong>Primary metrics</strong></td>
@@ -42,7 +42,7 @@
 
 Python performance is not determined by syntax alone. It emerges from several interacting layers: CPython interpreter overhead, object representation, array layout, compiled numerical kernels, CPU caches, and memory bandwidth.
 
-This repository investigates those layers through small, independently reproducible experiments. The first eight studies move from Python nested-list traversal to NumPy memory layout, Numba compilation, working-set scaling, element width, non-contiguous views, vectorization, and hardware cache-counter measurement.
+This repository investigates those layers through small, independently reproducible experiments. The first nine studies move from Python nested-list traversal to NumPy memory layout, Numba compilation, working-set scaling, element width, non-contiguous views, vectorization, hardware cache-counter measurement, and CPU-bound threading under the Global Interpreter Lock.
 
 The reference results show three recurring patterns:
 
@@ -58,7 +58,13 @@ Python is a high-level, dynamically typed language designed for clarity and deve
 
 That model is flexible, but it adds work to every iteration. A Python `int` or `float` is also an object with metadata rather than only a raw numeric value. Consequently, a simple loop can spend more time managing the Python runtime than performing arithmetic.
 
-NumPy changes the execution model by storing homogeneous values in compact multidimensional buffers. Numba can compile selected Python functions into machine code. These tools reduce interpreter overhead, making lower-level effects such as strides, cache locality, and memory bandwidth easier to observe.
+### The GIL, Threads, and Processes
+
+Most standard CPython builds use a **Global Interpreter Lock (GIL)**. A thread must hold this lock while it executes Python bytecode, so multiple threads in one process normally cannot run a pure-Python CPU loop on several cores at the same instant. The operating system may move those threads among cores, but their bytecode execution is still serialized by the lock.
+
+This does not make threading useless. Threads can overlap network, file, and other waiting operations because the active thread can release the GIL while it waits. NumPy and other native extensions may also release the GIL around compiled work. For CPU-bound pure-Python code, separate processes can provide true parallel execution because every process owns a separate interpreter and GIL, although process startup, serialization, and inter-process communication introduce costs.
+
+NumPy changes the execution model by storing homogeneous values in compact multidimensional buffers. Numba can compile selected Python functions into machine code. These tools reduce interpreter overhead, making lower-level effects such as strides, cache locality, memory bandwidth, and native parallel execution easier to observe.
 
 <blockquote>
   <strong>Central idea:</strong> optimization begins by identifying which layer is dominant—the interpreter, data representation, memory access, allocation, or hardware.
@@ -76,8 +82,9 @@ This study currently focuses on single-process numerical and memory-access behav
 - What cost is deferred when a cheap NumPy view is non-contiguous?
 - How much does vectorization improve execution time and allocation behavior?
 - Do timing differences occur alongside hardware cache misses?
+- Do additional Python threads accelerate a CPU-bound pure-Python workload?
 
-Concurrency, multiprocessing, garbage collection, object overhead, alternative Python runtimes, and asynchronous I/O remain planned studies in [`table.md`](table.md).
+Multiprocessing, garbage collection, object overhead, alternative Python runtimes, and asynchronous I/O remain planned studies in [`table.md`](table.md).
 
 ## 3. Experimental Method
 
@@ -146,6 +153,11 @@ Input construction is normally excluded from timed kernels unless allocation is 
       <td>NumPy was 5.35× faster and used less peak traced allocation in Experiment 07.</td>
       <td>Compiled array loops outperform repeated dynamic Python operations for this workload.</td>
     </tr>
+    <tr>
+      <td><strong>CPU-bound Python threads did not scale</strong></td>
+      <td>Two and four threads achieved 0.97× and 0.98× sequential speed in Experiment 09.</td>
+      <td>The GIL kept this pure-Python workload near one-core utilization while thread management added overhead.</td>
+    </tr>
   </tbody>
 </table>
 
@@ -165,6 +177,7 @@ Reference values are machine- and workload-specific. Timing alone does not prove
 | 06 | [Contiguous vs Non-Contiguous Arrays](experiments/exp06_contiguous_vs_non_contiguous/README.md) | What cost do slices and transposed views impose later? | Complete |
 | 07 | [Vectorization vs Python Loops](experiments/exp07_vectorization_vs_python_loops/README.md) | How much interpreter overhead does vectorization remove? | Complete |
 | 08 | [Cache Miss Measurement](experiments/exp08_cache_miss_measurement/README.md) | Do runtime differences coincide with cache miss behavior? | Awaiting Linux measurement |
+| 09 | [Sequential vs Threading](experiments/exp09_sequential_vs_threading/README.md) | Why do more threads not accelerate CPU-bound Python work? | Complete |
 
 The complete research roadmap is maintained in [`table.md`](table.md).
 
@@ -234,11 +247,11 @@ The experiments completed so far support a layered view of Python performance:
 
 <div align="center">
 
-**Python runtime overhead → data representation → memory access pattern → hardware behavior**
+**Python runtime and GIL → data representation → memory access pattern → hardware behavior**
 
 </div>
 
-Optimizing only the visible loop can miss the actual bottleneck. Pure Python code may be interpreter-bound; compiled code may become locality-bound; contiguous bulk operations may become bandwidth-bound. Reliable performance work therefore requires controlled measurement, correctness checks, and conclusions limited to the evidence collected.
+Optimizing only the visible loop can miss the actual bottleneck. Pure Python code may be interpreter- or GIL-bound; compiled code may become locality-bound; contiguous bulk operations may become bandwidth-bound. Threads help when work waits or releases the GIL, but they did not parallelize the pure-Python CPU loop measured here. Reliable performance work therefore requires controlled measurement, correctness checks, and conclusions limited to the evidence collected.
 
 ---
 

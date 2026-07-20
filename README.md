@@ -22,7 +22,7 @@
     <td><strong>Study type</strong></td>
     <td>Controlled performance experiments</td>
     <td><strong>Implemented</strong></td>
-    <td>10 experiments</td>
+    <td>11 experiments</td>
   </tr>
   <tr>
     <td><strong>Primary metrics</strong></td>
@@ -42,7 +42,7 @@
 
 Python performance is not determined by syntax alone. It emerges from several interacting layers: CPython interpreter overhead, object representation, array layout, compiled numerical kernels, CPU caches, and memory bandwidth.
 
-This repository investigates those layers through small, independently reproducible experiments. The first ten studies move from Python nested-list traversal to NumPy memory layout, Numba compilation, working-set scaling, element width, non-contiguous views, vectorization, hardware cache-counter measurement, CPU-bound threading under the Global Interpreter Lock, and multiprocessing across independent interpreters.
+This repository investigates those layers through small, independently reproducible experiments. The first eleven studies move from Python nested-list traversal to NumPy memory layout, Numba compilation, working-set scaling, element width, non-contiguous views, vectorization, hardware cache-counter measurement, CPU-bound threading under the Global Interpreter Lock, multiprocessing across independent interpreters, and the task granularity needed to amortize process overhead.
 
 The reference results show three recurring patterns:
 
@@ -84,8 +84,9 @@ This study currently focuses on single-process numerical and memory-access behav
 - Do timing differences occur alongside hardware cache misses?
 - Do additional Python threads accelerate a CPU-bound pure-Python workload?
 - When does multiprocessing accelerate a CPU-bound pure-Python workload?
+- How large must CPU-bound tasks become before multiprocessing overhead is recovered?
 
-Task-size overhead, garbage collection, object overhead, alternative Python runtimes, and asynchronous I/O remain planned studies in [`table.md`](table.md).
+Garbage collection, object overhead, alternative Python runtimes, and asynchronous I/O remain planned studies in [`table.md`](table.md).
 
 ## 3. Experimental Method
 
@@ -164,6 +165,11 @@ Input construction is normally excluded from timed kernels unless allocation is 
       <td>Two and four processes achieved 1.66× and 2.37× speedup in Experiment 10.</td>
       <td>Independent interpreters bypassed the single-process GIL, while overhead and shared resources kept scaling sublinear.</td>
     </tr>
+    <tr>
+      <td><strong>Task size determined whether processes paid off</strong></td>
+      <td>Four processes were slower through 100K iterations per task, but reached 3.33× speedup at 1M in Experiment 11.</td>
+      <td>Process lifecycle and dispatch costs dominated fine-grained work; only the largest sampled task size amortized them.</td>
+    </tr>
   </tbody>
 </table>
 
@@ -185,6 +191,7 @@ Reference values are machine- and workload-specific. Timing alone does not prove
 | 08 | [Cache Miss Measurement](experiments/exp08_cache_miss_measurement/README.md) | Do runtime differences coincide with cache miss behavior? | Awaiting Linux measurement |
 | 09 | [Sequential vs Threading](experiments/exp09_sequential_vs_threading/README.md) | Why do more threads not accelerate CPU-bound Python work? | Complete |
 | 10 | [Sequential vs Multiprocessing](experiments/exp10_sequential_vs_multiprocessing/README.md) | When do processes accelerate CPU-bound Python work? | Complete |
+| 11 | [Task Size and Process Overhead](experiments/exp11_task_size_process_overhead/README.md) | When does useful computation outweigh process overhead? | Complete |
 
 The complete research roadmap is maintained in [`table.md`](table.md).
 
@@ -241,7 +248,7 @@ Python_Exp/
 ├── experiments/
 │   ├── exp01_list_traversal/
 │   ├── ...
-│   └── exp10_sequential_vs_multiprocessing/
+│   └── exp11_task_size_process_overhead/
 ├── tests/
 ├── table.md
 ├── prompt.md
@@ -258,7 +265,7 @@ The experiments completed so far support a layered view of Python performance:
 
 </div>
 
-Optimizing only the visible loop can miss the actual bottleneck. Pure Python code may be interpreter- or GIL-bound; compiled code may become locality-bound; contiguous bulk operations may become bandwidth-bound. Threads help when work waits or releases the GIL, but they did not parallelize the pure-Python CPU loop measured here. Separate processes did parallelize the same class of CPU work, although their efficiency declined as worker count increased. Reliable performance work therefore requires controlled measurement, correctness checks, and conclusions limited to the evidence collected.
+Optimizing only the visible loop can miss the actual bottleneck. Pure Python code may be interpreter- or GIL-bound; compiled code may become locality-bound; contiguous bulk operations may become bandwidth-bound. Threads help when work waits or releases the GIL, but they did not parallelize the pure-Python CPU loop measured here. Separate processes did parallelize the same class of CPU work, although their efficiency declined as worker count increased and small tasks could not recover process lifecycle costs. Reliable performance work therefore requires controlled measurement, correctness checks, and conclusions limited to the evidence collected.
 
 ---
 

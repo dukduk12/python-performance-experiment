@@ -22,7 +22,7 @@
     <td><strong>Study type</strong></td>
     <td>Controlled performance experiments</td>
     <td><strong>Implemented</strong></td>
-    <td>11 experiments</td>
+    <td>12 experiments</td>
   </tr>
   <tr>
     <td><strong>Primary metrics</strong></td>
@@ -42,7 +42,7 @@
 
 Python performance is not determined by syntax alone. It emerges from several interacting layers: CPython interpreter overhead, object representation, array layout, compiled numerical kernels, CPU caches, and memory bandwidth.
 
-This repository investigates those layers through small, independently reproducible experiments. The first eleven studies move from Python nested-list traversal to NumPy memory layout, Numba compilation, working-set scaling, element width, non-contiguous views, vectorization, hardware cache-counter measurement, CPU-bound threading under the Global Interpreter Lock, multiprocessing across independent interpreters, and the task granularity needed to amortize process overhead.
+This repository investigates those layers through small, independently reproducible experiments. The first twelve studies also cover multiprocessing task granularity and the contrasting effect of threads on CPU-bound and waiting workloads.
 
 The reference results show three recurring patterns:
 
@@ -85,6 +85,7 @@ This study currently focuses on single-process numerical and memory-access behav
 - Do additional Python threads accelerate a CPU-bound pure-Python workload?
 - When does multiprocessing accelerate a CPU-bound pure-Python workload?
 - How large must CPU-bound tasks become before multiprocessing overhead is recovered?
+- Why does threading help waiting tasks but not CPU-bound Python bytecode?
 
 Garbage collection, object overhead, alternative Python runtimes, and asynchronous I/O remain planned studies in [`table.md`](table.md).
 
@@ -170,6 +171,11 @@ Input construction is normally excluded from timed kernels unless allocation is 
       <td>Four processes were slower through 100K iterations per task, but reached 3.33× speedup at 1M in Experiment 11.</td>
       <td>Process lifecycle and dispatch costs dominated fine-grained work; only the largest sampled task size amortized them.</td>
     </tr>
+    <tr>
+      <td><strong>Threads overlapped waiting, not Python computation</strong></td>
+      <td>Four threads reached 3.98× speedup for waiting tasks but only 0.95× for CPU-bound tasks in Experiment 12.</td>
+      <td>Blocking waits released the GIL, while pure-Python bytecode remained effectively limited to one core.</td>
+    </tr>
   </tbody>
 </table>
 
@@ -192,6 +198,7 @@ Reference values are machine- and workload-specific. Timing alone does not prove
 | 09 | [Sequential vs Threading](experiments/exp09_sequential_vs_threading/README.md) | Why do more threads not accelerate CPU-bound Python work? | Complete |
 | 10 | [Sequential vs Multiprocessing](experiments/exp10_sequential_vs_multiprocessing/README.md) | When do processes accelerate CPU-bound Python work? | Complete |
 | 11 | [Task Size and Process Overhead](experiments/exp11_task_size_process_overhead/README.md) | When does useful computation outweigh process overhead? | Complete |
+| 12 | [CPU-bound vs I/O-bound](experiments/exp12_cpu_vs_io_bound/README.md) | For which kind of work does threading help? | Complete |
 
 The complete research roadmap is maintained in [`table.md`](table.md).
 
@@ -248,7 +255,7 @@ Python_Exp/
 ├── experiments/
 │   ├── exp01_list_traversal/
 │   ├── ...
-│   └── exp11_task_size_process_overhead/
+│   └── exp12_cpu_vs_io_bound/
 ├── tests/
 ├── table.md
 ├── prompt.md

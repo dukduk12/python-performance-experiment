@@ -22,7 +22,7 @@
     <td><strong>Study type</strong></td>
     <td>Controlled performance experiments</td>
     <td><strong>Implemented</strong></td>
-    <td>12 experiments</td>
+    <td>13 experiments</td>
   </tr>
   <tr>
     <td><strong>Primary metrics</strong></td>
@@ -42,7 +42,7 @@
 
 Python performance is not determined by syntax alone. It emerges from several interacting layers: CPython interpreter overhead, object representation, array layout, compiled numerical kernels, CPU caches, and memory bandwidth.
 
-This repository investigates those layers through small, independently reproducible experiments. The first twelve studies also cover multiprocessing task granularity and the contrasting effect of threads on CPU-bound and waiting workloads.
+This repository investigates those layers through small, independently reproducible experiments. The first thirteen studies also cover multiprocessing task granularity, the contrasting effect of threads on CPU-bound and waiting workloads, and process-worker scaling.
 
 The reference results show three recurring patterns:
 
@@ -86,6 +86,7 @@ This study currently focuses on single-process numerical and memory-access behav
 - When does multiprocessing accelerate a CPU-bound pure-Python workload?
 - How large must CPU-bound tasks become before multiprocessing overhead is recovered?
 - Why does threading help waiting tasks but not CPU-bound Python bytecode?
+- How do speedup and efficiency change as process-worker count increases?
 
 Garbage collection, object overhead, alternative Python runtimes, and asynchronous I/O remain planned studies in [`table.md`](table.md).
 
@@ -176,6 +177,11 @@ Input construction is normally excluded from timed kernels unless allocation is 
       <td>Four threads reached 3.98× speedup for waiting tasks but only 0.95× for CPU-bound tasks in Experiment 12.</td>
       <td>Blocking waits released the GIL, while pure-Python bytecode remained effectively limited to one core.</td>
     </tr>
+    <tr>
+      <td><strong>Process scaling showed diminishing returns</strong></td>
+      <td>One, two, four, and eight workers achieved 1.00×, 2.02×, 3.31×, and 3.97× speedup in Experiment 13.</td>
+      <td>Parallel execution reduced wall time, but eight-worker efficiency fell to 49.7% as fixed and shared costs became more significant.</td>
+    </tr>
   </tbody>
 </table>
 
@@ -199,6 +205,7 @@ Reference values are machine- and workload-specific. Timing alone does not prove
 | 10 | [Sequential vs Multiprocessing](experiments/exp10_sequential_vs_multiprocessing/README.md) | When do processes accelerate CPU-bound Python work? | Complete |
 | 11 | [Task Size and Process Overhead](experiments/exp11_task_size_process_overhead/README.md) | When does useful computation outweigh process overhead? | Complete |
 | 12 | [CPU-bound vs I/O-bound](experiments/exp12_cpu_vs_io_bound/README.md) | For which kind of work does threading help? | Complete |
+| 13 | [Worker Count Scaling](experiments/exp13_worker_count_scaling/README.md) | How does performance change as process workers increase? | Complete |
 
 The complete research roadmap is maintained in [`table.md`](table.md).
 
@@ -255,7 +262,7 @@ Python_Exp/
 ├── experiments/
 │   ├── exp01_list_traversal/
 │   ├── ...
-│   └── exp12_cpu_vs_io_bound/
+│   └── exp13_worker_count_scaling/
 ├── tests/
 ├── table.md
 ├── prompt.md
@@ -272,7 +279,7 @@ The experiments completed so far support a layered view of Python performance:
 
 </div>
 
-Optimizing only the visible loop can miss the actual bottleneck. Pure Python code may be interpreter- or GIL-bound; compiled code may become locality-bound; contiguous bulk operations may become bandwidth-bound. Threads help when work waits or releases the GIL, but they did not parallelize the pure-Python CPU loop measured here. Separate processes did parallelize the same class of CPU work, although their efficiency declined as worker count increased and small tasks could not recover process lifecycle costs. Reliable performance work therefore requires controlled measurement, correctness checks, and conclusions limited to the evidence collected.
+Optimizing only the visible loop can miss the actual bottleneck. Pure Python code may be interpreter- or GIL-bound; compiled code may become locality-bound; contiguous bulk operations may become bandwidth-bound. Threads help when work waits or releases the GIL, but they did not parallelize the pure-Python CPU loop measured here. Separate processes did parallelize the same class of CPU work, although small tasks could not recover process lifecycle costs and eight-worker efficiency fell to 49.7% in the fixed-work scaling experiment. Reliable performance work therefore requires controlled measurement, correctness checks, and conclusions limited to the evidence collected.
 
 ---
 

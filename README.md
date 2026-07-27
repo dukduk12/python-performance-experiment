@@ -22,7 +22,7 @@
     <td><strong>Study type</strong></td>
     <td>Controlled performance experiments</td>
     <td><strong>Implemented</strong></td>
-    <td>17 experiments</td>
+    <td>18 experiments</td>
   </tr>
   <tr>
     <td><strong>Primary metrics</strong></td>
@@ -42,7 +42,7 @@
 
 Python performance is not determined by syntax alone. It emerges from several interacting layers: CPython interpreter overhead, object representation, array layout, compiled numerical kernels, CPU caches, and memory bandwidth.
 
-This repository investigates those layers through small, independently reproducible experiments. The first seventeen studies also cover multiprocessing task granularity, the contrasting effect of threads on CPU-bound and waiting workloads, process-worker scaling, native NumPy execution across Python threads, BLAS threading, oversubscription between Python and native worker pools, and the allocation cost of copying arrays instead of creating views.
+This repository investigates those layers through small, independently reproducible experiments. The first eighteen studies also cover multiprocessing task granularity, the contrasting effect of threads on CPU-bound and waiting workloads, process-worker scaling, native NumPy execution across Python threads, BLAS threading, oversubscription between Python and native worker pools, array ownership, and the separate creation and traversal costs of transposed arrays.
 
 The reference results show three recurring patterns:
 
@@ -90,6 +90,7 @@ This study currently focuses on single-process numerical and memory-access behav
 - Can independent NumPy operations run concurrently in Python threads?
 - How does the native BLAS thread count affect matrix-multiplication performance?
 - When do combined Python and BLAS thread pools create counterproductive oversubscription?
+- How does a cheap transpose view compare with a contiguous copy during creation and later traversal?
 
 ## 3. Experimental Method
 
@@ -203,6 +204,11 @@ Input construction is normally excluded from timed kernels unless allocation is 
       <td>For a 2048² float64 array, copying took 9.30 ms and allocated 32.0005 MiB; slicing and <code>.view()</code> took 25–30 µs and allocated less than 0.6 KiB in Experiment 17.</td>
       <td>Views created small metadata objects that shared the source buffer, while copying duplicated every element into independently owned storage.</td>
     </tr>
+    <tr>
+      <td><strong>Transpose and materialization were separate costs</strong></td>
+      <td>At 2048², <code>.T</code> took 15 µs and 188 traced bytes, while a contiguous copy took 77.84 ms and 32.0002 MiB in Experiment 18.</td>
+      <td>The view changed metadata and shared storage; materialization copied the payload, and did not improve the measured NumPy reduction.</td>
+    </tr>
   </tbody>
 </table>
 
@@ -231,6 +237,7 @@ Reference values are machine- and workload-specific. Timing alone does not prove
 | 15 | [BLAS Threading](experiments/exp15_blas_threading/README.md) | How does the native BLAS thread count affect matrix multiplication? | Complete |
 | 16 | [Oversubscription](experiments/exp16_oversubscription/README.md) | Why can combining Python and BLAS thread pools make a workload slower? | Complete |
 | 17 | [Memory Copy vs View](experiments/exp17_memory_copy_vs_view/README.md) | How different are the creation-time and memory costs of copies and views? | Complete |
+| 18 | [Transpose Cost](experiments/exp18_transpose_cost/README.md) | How do transpose creation and later traversal costs differ? | Complete |
 
 ## 6. Reproducing the Study
 
@@ -285,7 +292,7 @@ Python_Exp/
 ├── experiments/
 │   ├── exp01_list_traversal/
 │   ├── ...
-│   └── exp17_memory_copy_vs_view/
+│   └── exp18_transpose_cost/
 ├── tests/
 └── pyproject.toml
 ```
@@ -300,7 +307,7 @@ The experiments completed so far support a layered view of Python performance:
 
 </div>
 
-Optimizing only the visible loop can miss the actual bottleneck. Pure Python code may be interpreter- or GIL-bound; compiled code may become locality-bound; contiguous bulk operations may become bandwidth-bound. Threads help when work waits or releases the GIL: they did not parallelize the measured pure-Python CPU loop, but four threads achieved 3.50× speedup when independent NumPy `sin` kernels released the GIL. Native BLAS threading also used several cores, although eight BLAS threads produced only 3.06× speedup. Combining Python and BLAS parallelism helped only until the CPU saturated: the 8×8 condition was slower than 8×4 and produced substantially more context switches. Separate processes parallelized pure-Python CPU work, although small tasks could not recover process lifecycle costs and eight-worker efficiency fell to 49.7% in the fixed-work scaling experiment. Array ownership matters as well: a 32 MiB copy duplicated the payload, while equivalent views shared it through sub-kilobyte metadata. Reliable performance work therefore requires controlled measurement, explicit control of every active worker pool, correctness and ownership checks, and conclusions limited to the evidence collected.
+Optimizing only the visible loop can miss the actual bottleneck. Pure Python code may be interpreter- or GIL-bound; compiled code may become locality-bound; contiguous bulk operations may become bandwidth-bound. Threads help when work waits or releases the GIL: they did not parallelize the measured pure-Python CPU loop, but four threads achieved 3.50× speedup when independent NumPy `sin` kernels released the GIL. Native BLAS threading also used several cores, although eight BLAS threads produced only 3.06× speedup. Combining Python and BLAS parallelism helped only until the CPU saturated: the 8×8 condition was slower than 8×4 and produced substantially more context switches. Separate processes parallelized pure-Python CPU work, although small tasks could not recover process lifecycle costs and eight-worker efficiency fell to 49.7% in the fixed-work scaling experiment. Array ownership matters as well: a 32 MiB copy duplicated the payload, while equivalent views shared it through sub-kilobyte metadata. Experiment 18 further showed that `.T` itself is metadata-only and that paying to materialize a contiguous transpose must be justified by the actual downstream kernel, not strides alone. Reliable performance work therefore requires controlled measurement, explicit control of every active worker pool, correctness and ownership checks, and conclusions limited to the evidence collected.
 
 ---
 

@@ -82,18 +82,6 @@ Repeat the same protocol on multiple CPUs and Python/Numba versions, record CPU 
 
 Threats to validity include one operating system and CPU environment, only C-order square `int64` arrays, short Numba runtimes near timer-resolution and scheduling noise, and the absence of hardware performance counters.
 
-Suggested commit message: `feat: add Experiment 03 Python vs Numba benchmark`
-
-Suggested folder structure (implemented):
-
-```text
-experiments/exp03_python_vs_numba/
-├── README.md
-├── benchmark.py
-├── figures/median_times.png
-└── results/                 # generated CSV and metadata (gitignored)
-```
-
 ---
 
 ## 한국어
@@ -171,7 +159,3 @@ uv run python experiments/exp03_python_vs_numba/benchmark.py --quick
 여러 CPU와 Python/Numba 버전에서 같은 절차를 반복하고 CPU 주파수와 발열 상태를 기록할 수 있다. 가능한 환경에서는 하드웨어 카운터를 수집하고, 컴파일 지연을 정상 상태 실행 시간과 분리해 별도 보고할 수 있다.
 
 한계는 단일 운영체제와 CPU 환경, C-order 정사각형 `int64` 배열만 사용한 점, 매우 짧은 Numba 실행이 타이머 해상도와 스케줄링 잡음에 민감한 점, 하드웨어 성능 카운터가 없다는 점이다.
-
-추천 커밋 메시지: `feat: add Experiment 03 Python vs Numba benchmark`
-
-제안 폴더 구조는 위에 표시한 형태로 구현했다.

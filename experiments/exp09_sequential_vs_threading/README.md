@@ -2,6 +2,7 @@
 
 [English](#english) · [한국어](#한국어)
 
+![Sequential and threaded benchmark results](figures/threading.png)
 ---
 
 ## English
@@ -80,8 +81,6 @@ The benchmark writes `results/raw.csv`, `results/summary.csv`, and
 Two threads were about 2.9% slower and four threads about 2.2% slower than
 sequential execution. CPU use stayed near one core rather than growing toward
 200% or 400%.
-
-![Sequential and threaded benchmark results](figures/threading.png)
 
 ### Discussion
 
@@ -181,8 +180,6 @@ uv run python experiments/exp09_sequential_vs_threading/benchmark.py --quick
 
 2-thread 조건은 순차 실행보다 약 2.9%, 4-thread 조건은 약 2.2% 느렸다.
 CPU 사용률도 200%나 400%로 증가하지 않고 한 코어 수준에 머물렀다.
-
-![순차 실행과 스레딩 벤치마크 결과](figures/threading.png)
 
 ### 논의
 

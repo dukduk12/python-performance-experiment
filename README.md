@@ -22,7 +22,7 @@
     <td><strong>Study type</strong></td>
     <td>Controlled performance experiments</td>
     <td><strong>Implemented</strong></td>
-    <td>16 experiments</td>
+    <td>17 experiments</td>
   </tr>
   <tr>
     <td><strong>Primary metrics</strong></td>
@@ -42,7 +42,7 @@
 
 Python performance is not determined by syntax alone. It emerges from several interacting layers: CPython interpreter overhead, object representation, array layout, compiled numerical kernels, CPU caches, and memory bandwidth.
 
-This repository investigates those layers through small, independently reproducible experiments. The first sixteen studies also cover multiprocessing task granularity, the contrasting effect of threads on CPU-bound and waiting workloads, process-worker scaling, native NumPy execution across Python threads, BLAS threading, and oversubscription between Python and native worker pools.
+This repository investigates those layers through small, independently reproducible experiments. The first seventeen studies also cover multiprocessing task granularity, the contrasting effect of threads on CPU-bound and waiting workloads, process-worker scaling, native NumPy execution across Python threads, BLAS threading, oversubscription between Python and native worker pools, and the allocation cost of copying arrays instead of creating views.
 
 The reference results show three recurring patterns:
 
@@ -198,6 +198,11 @@ Input construction is normally excluded from timed kernels unless allocation is 
       <td>The 8×8 Python/BLAS condition was 17.0% slower than 8×4, while median context switches rose from 1,643 to 2,347 in Experiment 16.</td>
       <td>Additional native threads increased scheduling activity without proportional useful work after the workload reached CPU saturation.</td>
     </tr>
+    <tr>
+      <td><strong>NumPy views avoided payload-sized allocation</strong></td>
+      <td>For a 2048² float64 array, copying took 9.30 ms and allocated 32.0005 MiB; slicing and <code>.view()</code> took 25–30 µs and allocated less than 0.6 KiB in Experiment 17.</td>
+      <td>Views created small metadata objects that shared the source buffer, while copying duplicated every element into independently owned storage.</td>
+    </tr>
   </tbody>
 </table>
 
@@ -225,6 +230,7 @@ Reference values are machine- and workload-specific. Timing alone does not prove
 | 14 | [NumPy and the GIL](experiments/exp14_numpy_and_gil/README.md) | Can NumPy operations execute concurrently in Python threads? | Complete |
 | 15 | [BLAS Threading](experiments/exp15_blas_threading/README.md) | How does the native BLAS thread count affect matrix multiplication? | Complete |
 | 16 | [Oversubscription](experiments/exp16_oversubscription/README.md) | Why can combining Python and BLAS thread pools make a workload slower? | Complete |
+| 17 | [Memory Copy vs View](experiments/exp17_memory_copy_vs_view/README.md) | How different are the creation-time and memory costs of copies and views? | Complete |
 
 ## 6. Reproducing the Study
 
@@ -279,7 +285,7 @@ Python_Exp/
 ├── experiments/
 │   ├── exp01_list_traversal/
 │   ├── ...
-│   └── exp16_oversubscription/
+│   └── exp17_memory_copy_vs_view/
 ├── tests/
 └── pyproject.toml
 ```
@@ -294,7 +300,7 @@ The experiments completed so far support a layered view of Python performance:
 
 </div>
 
-Optimizing only the visible loop can miss the actual bottleneck. Pure Python code may be interpreter- or GIL-bound; compiled code may become locality-bound; contiguous bulk operations may become bandwidth-bound. Threads help when work waits or releases the GIL: they did not parallelize the measured pure-Python CPU loop, but four threads achieved 3.50× speedup when independent NumPy `sin` kernels released the GIL. Native BLAS threading also used several cores, although eight BLAS threads produced only 3.06× speedup. Combining Python and BLAS parallelism helped only until the CPU saturated: the 8×8 condition was slower than 8×4 and produced substantially more context switches. Separate processes parallelized pure-Python CPU work, although small tasks could not recover process lifecycle costs and eight-worker efficiency fell to 49.7% in the fixed-work scaling experiment. Reliable performance work therefore requires controlled measurement, explicit control of every active worker pool, correctness checks, and conclusions limited to the evidence collected.
+Optimizing only the visible loop can miss the actual bottleneck. Pure Python code may be interpreter- or GIL-bound; compiled code may become locality-bound; contiguous bulk operations may become bandwidth-bound. Threads help when work waits or releases the GIL: they did not parallelize the measured pure-Python CPU loop, but four threads achieved 3.50× speedup when independent NumPy `sin` kernels released the GIL. Native BLAS threading also used several cores, although eight BLAS threads produced only 3.06× speedup. Combining Python and BLAS parallelism helped only until the CPU saturated: the 8×8 condition was slower than 8×4 and produced substantially more context switches. Separate processes parallelized pure-Python CPU work, although small tasks could not recover process lifecycle costs and eight-worker efficiency fell to 49.7% in the fixed-work scaling experiment. Array ownership matters as well: a 32 MiB copy duplicated the payload, while equivalent views shared it through sub-kilobyte metadata. Reliable performance work therefore requires controlled measurement, explicit control of every active worker pool, correctness and ownership checks, and conclusions limited to the evidence collected.
 
 ---
 

@@ -2,7 +2,7 @@
 
 # Python Performance Laboratory
 
-### An Experimental Study of Interpreter Overhead, Memory Layout, and Data Locality
+### From Python Objects and the GIL to CPU Caches, Memory, and Parallelism
 
 <p>
   <strong>A living, reproducible research repository</strong><br>
@@ -22,7 +22,7 @@
     <td><strong>Study type</strong></td>
     <td>Controlled performance experiments</td>
     <td><strong>Implemented</strong></td>
-    <td>18 experiments</td>
+    <td>25 experiments</td>
   </tr>
   <tr>
     <td><strong>Primary metrics</strong></td>
@@ -38,33 +38,149 @@
   </tr>
 </table>
 
-## Abstract
+## What This Repository Is
 
 Python performance is not determined by syntax alone. It emerges from several interacting layers: CPython interpreter overhead, object representation, array layout, compiled numerical kernels, CPU caches, and memory bandwidth.
 
-This repository investigates those layers through small, independently reproducible experiments. The first eighteen studies also cover multiprocessing task granularity, the contrasting effect of threads on CPU-bound and waiting workloads, process-worker scaling, native NumPy execution across Python threads, BLAS threading, oversubscription between Python and native worker pools, array ownership, and the separate creation and traversal costs of transposed arrays.
+This repository is a hands-on Python performance laboratory. It starts with
+basic questions—such as why loop order matters—and gradually moves toward
+memory layout, compiled execution, concurrency, garbage collection, runtime
+implementations, false sharing, and benchmark reliability.
 
-The reference results show three recurring patterns:
+It is not a finished application or a collection of isolated timing tricks.
+Each directory contains a small research study with a question, hypothesis,
+controlled workload, executable benchmark, raw measurements, summary data,
+figure, discussion, and limitations. The repository is designed to grow while
+keeping every experiment independently understandable and reproducible.
 
-1. Access order matters, but Python interpreter work can hide much of its cost.
-2. Compiled and vectorized execution exposes memory-layout effects more clearly.
-3. Moving contiguous bytes efficiently is often more important than the nominal numeric type.
+The experiments are organized around five recurring ideas:
+
+1. Python runtime overhead can dominate a small loop.
+2. Data representation and memory layout affect what the hardware must do.
+3. Threads, processes, and native libraries follow different parallelism rules.
+4. Allocation, ownership, garbage collection, and copying exchange time for memory.
+5. A performance claim is only as reliable as its measurement method.
 
 These findings are observations from documented benchmark environments, not universal constants. Each experiment records its assumptions and limitations.
 
-## 1. Python: A Short Performance Primer
+## 1. Performance Foundations
 
-Python is a high-level, dynamically typed language designed for clarity and developer productivity. In the standard CPython implementation, a loop normally executes interpreter bytecode and repeatedly performs dynamic type checks, object access, and reference-count operations.
+### 1.1 Python and CPython
 
-That model is flexible, but it adds work to every iteration. A Python `int` or `float` is also an object with metadata rather than only a raw numeric value. Consequently, a simple loop can spend more time managing the Python runtime than performing arithmetic.
+Python is a programming language; CPython is its most widely used
+implementation. CPython compiles source code to bytecode and executes that
+bytecode in an interpreter. A Python loop therefore performs more than the
+visible arithmetic: it dispatches bytecode, resolves dynamic types, accesses
+objects, updates reference counts, and handles exceptions and iteration
+protocols.
 
-### The GIL, Threads, and Processes
+That model is flexible, but it adds work to every iteration. A Python `int` is
+also a heap object with type and reference-count metadata, while a list stores
+references to objects rather than unboxed numeric values. A simple numeric loop
+can consequently spend more time managing Python semantics than performing its
+arithmetic.
 
-Most standard CPython builds use a **Global Interpreter Lock (GIL)**. A thread must hold this lock while it executes Python bytecode, so multiple threads in one process normally cannot run a pure-Python CPU loop on several cores at the same instant. The operating system may move those threads among cores, but their bytecode execution is still serialized by the lock.
+### 1.2 Contiguous Data and NumPy
+
+NumPy uses a different representation. An `int64` array normally stores
+fixed-width eight-byte values in one homogeneous buffer. Its shape and strides
+describe how logical indices map to memory:
+
+```text
+address = base + row × row_stride + column × column_stride
+```
+
+A C-order two-dimensional array stores the last axis contiguously. An F-order
+array stores the first axis contiguously. Slices and transposes can create
+views that share the same buffer with different shape and stride metadata.
+Creating a view is cheap, but a later operation may still pay for a
+non-contiguous access pattern.
+
+### 1.3 CPU Caches and Locality
+
+CPUs do not normally fetch one scalar from main memory in isolation. Data moves
+through a hierarchy of cache lines and cache levels. Sequential access tends
+to reuse the bytes already fetched in a cache line and is easier for hardware
+prefetchers to predict. Large-stride access can load many cache lines while
+using only a small part of each one.
+
+This is why row-first and column-first traversal can behave differently even
+when both visit exactly the same values. The size of the working set matters:
+an unfavorable pattern may be barely visible when data fits in cache and much
+more expensive when it repeatedly reaches lower cache levels or memory.
+
+Timing alone, however, does not prove that cache misses caused a difference.
+Hardware counters, layout metadata, controlled comparisons, and repeated
+measurements provide stronger evidence together.
+
+### 1.4 Vectorization and Compilation
+
+Vectorization moves a loop from Python bytecode into a compiled native
+implementation. Numba takes another route by compiling selected Python
+functions to machine code. Both approaches reduce per-element interpreter
+work. Once that overhead is removed, memory bandwidth, cache locality, SIMD,
+and native thread pools can become the dominant constraints.
+
+Vectorization is not synonymous with “always faster.” Temporary arrays,
+allocation, dtype conversion, non-contiguous input, or an unsuitable kernel
+can reduce its benefit. The actual operation and data layout still need to be
+measured.
+
+### 1.5 The GIL, Threads, and Processes
+
+Most standard CPython builds use a **Global Interpreter Lock (GIL)**.[^free-threaded]
+A thread must hold this lock while it executes Python bytecode, so multiple
+threads in one process normally cannot run a pure-Python CPU loop on several
+cores at the same instant. The operating system may move those threads among
+cores, but their bytecode execution is still serialized by the lock.
 
 This does not make threading useless. Threads can overlap network, file, and other waiting operations because the active thread can release the GIL while it waits. NumPy and other native extensions may also release the GIL around compiled work. For CPU-bound pure-Python code, separate processes can provide true parallel execution because every process owns a separate interpreter and GIL, although process startup, serialization, and inter-process communication introduce costs.
 
 NumPy changes the execution model by storing homogeneous values in compact multidimensional buffers. Numba can compile selected Python functions into machine code. These tools reduce interpreter overhead, making lower-level effects such as strides, cache locality, memory bandwidth, and native parallel execution easier to observe.
+
+Native libraries add another layer. NumPy ufuncs may release the GIL, and BLAS
+implementations may create their own worker threads. Combining a Python thread
+pool with a native thread pool can create more runnable threads than the
+machine can use effectively. This is called oversubscription.
+
+[^free-threaded]: Starting with Python 3.13, CPython also provides an optional
+    free-threaded build based on [PEP 703](https://peps.python.org/pep-0703/)
+    that can run with the GIL disabled and allow Python threads to execute in
+    parallel on multiple cores. Python 3.13 introduced this configuration as
+    experimental; it is separate from the regular GIL-enabled build and is not
+    the default. Some C-extension modules may also re-enable the GIL when they
+    are not marked as free-threading compatible. See the official
+    [free-threaded CPython guide](https://docs.python.org/3/howto/free-threading-python.html).
+
+### 1.6 Allocation, Ownership, and Garbage Collection
+
+Performance is also affected by object lifetime. Copying an array duplicates
+its payload and gives the result independent ownership. A view usually creates
+only a small metadata object, shares the original storage, and may defer costs
+to later operations.
+
+CPython primarily uses reference counting, supplemented by a cyclic garbage
+collector. Reference counting can immediately reclaim most objects but cannot
+alone reclaim unreachable reference cycles. Disabling cyclic GC can remove
+collection work from a measured region, while allowing cyclic garbage and
+memory use to accumulate until a later explicit collection.
+
+### 1.7 Basic Benchmark Terms
+
+| Term | Meaning |
+| --- | --- |
+| Latency | Time required for one operation or one batch |
+| Throughput | Amount of work completed per unit time |
+| Speedup | Baseline time divided by comparison time |
+| Scaling efficiency | Speedup divided by worker count |
+| Warm-up | Unreported work used to initialize caches, JITs, pools, or libraries |
+| Median | Middle sample; less sensitive to extreme outliers than the mean |
+| Standard deviation | Absolute spread around the sample mean |
+| Coefficient of variation | Standard deviation relative to the mean |
+| Working set | Data actively touched by a workload |
+| Contiguous | Elements of interest are adjacent in memory |
+| View | Array metadata that shares another array's storage |
+| Copy | Independently owned data produced by duplicating a payload |
 
 <blockquote>
   <strong>Central idea:</strong> optimization begins by identifying which layer is dominant—the interpreter, data representation, memory access, allocation, or hardware.
@@ -72,7 +188,16 @@ NumPy changes the execution model by storing homogeneous values in compact multi
 
 ## 2. Scope and Research Questions
 
-This study currently focuses on single-process numerical and memory-access behavior. It asks:
+The repository covers six connected areas:
+
+- interpreter and loop overhead;
+- array representation, layout, and memory locality;
+- threading, multiprocessing, asyncio, and native parallelism;
+- allocation, ownership, object overhead, and garbage collection;
+- runtime and hardware effects;
+- benchmark methodology and result stability.
+
+The complete set of research questions is:
 
 - Does row-first traversal outperform column-first traversal?
 - How do C-order and F-order arrays interact with traversal direction?
@@ -90,7 +215,26 @@ This study currently focuses on single-process numerical and memory-access behav
 - Can independent NumPy operations run concurrently in Python threads?
 - How does the native BLAS thread count affect matrix-multiplication performance?
 - When do combined Python and BLAS thread pools create counterproductive oversubscription?
+- How different are the creation-time and memory costs of copies and views?
 - How does a cheap transpose view compare with a contiguous copy during creation and later traversal?
+- What runtime and memory trade-off does cyclic garbage collection create?
+- How much more memory does a Python integer list require than a NumPy array?
+- How do CPython and PyPy loop performance and warm-up differ?
+- How do sequential I/O, threading, and asyncio compare?
+- Does separating concurrently written shared values reduce false sharing?
+- How do repetition count and condition order affect benchmark stability?
+- How different are a cold first run and later warm runs?
+
+### Out of Scope
+
+The repository does not attempt to rank every Python implementation, provide
+production tuning values, or replace application profiling. It does not claim
+that one measured speedup transfers unchanged to another CPU, operating system,
+library build, dataset, or workload.
+
+The experiments deliberately prefer small controlled comparisons over complete
+application realism. Their purpose is to expose mechanisms and measurement
+techniques that can later be applied to real programs.
 
 ## 3. Experimental Method
 
@@ -116,7 +260,44 @@ Report medians and variability
 Interpret within documented limits
 ```
 
-Input construction is normally excluded from timed kernels unless allocation is the subject of the experiment. Median time is the primary statistic because benchmark distributions often contain scheduling and frequency-related outliers. Exact protocols are documented per experiment.
+Input construction is normally excluded from timed kernels unless allocation
+is the subject of the experiment. Median time is the primary statistic because
+benchmark distributions often contain scheduling and frequency-related
+outliers. Exact protocols are documented per experiment.
+
+### Measurement Rules
+
+- Compare equivalent work and verify results with checksums or array equality.
+- Use `time.perf_counter_ns()` for elapsed wall-clock measurements.
+- Warm up JIT compilation, worker pools, and native libraries where relevant.
+- Repeat every condition; never build a conclusion from one timing.
+- Randomize or counterbalance execution order when order can introduce bias.
+- Keep setup, allocation, cleanup, and serialization outside the timer unless
+  they are explicitly part of the research question.
+- Record environment metadata and keep raw samples.
+- Report memory ownership, strides, worker counts, and active native thread
+  pools when they affect interpretation.
+- Treat CPU utilization and hardware counters as supporting evidence, not as a
+  substitute for correctness.
+
+### Output Contract
+
+Most completed experiment directories contain:
+
+```text
+expXX_name/
+├── README.md
+├── benchmark.py
+├── results/
+│   ├── raw.csv
+│   ├── summary.csv
+│   └── metadata.json
+└── figures/
+    └── result.png
+```
+
+The exact filenames vary when an experiment needs an additional kernel or a
+platform-specific command.
 
 ## 4. Principal Findings
 
@@ -209,6 +390,41 @@ Input construction is normally excluded from timed kernels unless allocation is 
       <td>At 2048², <code>.T</code> took 15 µs and 188 traced bytes, while a contiguous copy took 77.84 ms and 32.0002 MiB in Experiment 18.</td>
       <td>The view changed metadata and shared storage; materialization copied the payload, and did not improve the measured NumPy reduction.</td>
     </tr>
+    <tr>
+      <td><strong>Deferring cyclic GC exchanged memory for a small timing gain</strong></td>
+      <td>Disabling GC improved the measured allocation phase by 1.03×, while traced peak memory rose from 0.78 MiB to 29.01 MiB in Experiment 19.</td>
+      <td>Collection work moved outside the timed region; unreachable cycles were not made free.</td>
+    </tr>
+    <tr>
+      <td><strong>Boxed Python integers carried substantial representation cost</strong></td>
+      <td>At one million values, <code>list[int]</code> used about 36.00 bytes per element and an <code>int64</code> ndarray used 8.00 in Experiment 20.</td>
+      <td>The list stored references to separately allocated integer objects; NumPy stored fixed-width values in one buffer.</td>
+    </tr>
+    <tr>
+      <td><strong>Runtime comparisons require both runtimes</strong></td>
+      <td>Experiment 21 recorded a 0.2637 s CPython median, but PyPy was unavailable on the reference host.</td>
+      <td>The harness reports missing runtime coverage instead of turning a one-runtime measurement into a cross-runtime claim.</td>
+    </tr>
+    <tr>
+      <td><strong>Concurrent I/O overlapped waiting effectively</strong></td>
+      <td>Threads reached 19.28× and asyncio 72.96× sequential speed for 100 synthetic waits in Experiment 22.</td>
+      <td>Both models overlapped waiting; asyncio scheduled all waits without limiting concurrency to a 20-worker pool.</td>
+    </tr>
+    <tr>
+      <td><strong>Separating shared writes improved the observed timing</strong></td>
+      <td>Cache-line-separated slots were 1.34× faster than adjacent slots in Experiment 23.</td>
+      <td>The result is consistent with reduced coherence contention, but Linux hardware counters are still needed for stronger attribution.</td>
+    </tr>
+    <tr>
+      <td><strong>Larger samples narrowed estimated uncertainty</strong></td>
+      <td>For one randomized condition, the approximate 95% half-width fell from 0.000507 s at five samples to 0.000288 s at 30 in Experiment 24.</td>
+      <td>Repetition and execution order are parts of the experiment, not administrative details.</td>
+    </tr>
+    <tr>
+      <td><strong>The first CPU run differed from the warm distribution</strong></td>
+      <td>The first run was 1.051× slower than the warm-run median in Experiment 25.</td>
+      <td>Cold state and system dynamics should be measured before choosing a warm-up policy.</td>
+    </tr>
   </tbody>
 </table>
 
@@ -238,6 +454,13 @@ Reference values are machine- and workload-specific. Timing alone does not prove
 | 16 | [Oversubscription](experiments/exp16_oversubscription/README.md) | Why can combining Python and BLAS thread pools make a workload slower? | Complete |
 | 17 | [Memory Copy vs View](experiments/exp17_memory_copy_vs_view/README.md) | How different are the creation-time and memory costs of copies and views? | Complete |
 | 18 | [Transpose Cost](experiments/exp18_transpose_cost/README.md) | How do transpose creation and later traversal costs differ? | Complete |
+| 19 | [Garbage Collection Overhead](experiments/exp19_garbage_collection_overhead/README.md) | What time and memory trade-off does cyclic collection create? | Complete |
+| 20 | [CPython Object Overhead](experiments/exp20_cpython_object_overhead/README.md) | How different are the memory costs of boxed Python and fixed-width NumPy integers? | Complete |
+| 21 | [PyPy vs CPython](experiments/exp21_pypy_vs_cpython/README.md) | How do interpreter choice and JIT warm-up affect loop performance? | Harness complete; PyPy measurement pending |
+| 22 | [Async I/O vs Threading](experiments/exp22_async_io_vs_threading/README.md) | How do threads and asyncio overlap I/O waiting? | Complete |
+| 23 | [False Sharing](experiments/exp23_false_sharing/README.md) | Does cache-line separation improve concurrent shared-memory writes? | Timing complete; Linux counters pending |
+| 24 | [Benchmark Stability](experiments/exp24_benchmark_stability/README.md) | How do sample count and execution order affect result stability? | Complete |
+| 25 | [CPU Warm-up and Frequency Scaling](experiments/exp25_cpu_warmup_frequency_scaling/README.md) | How does the first run differ from the warm-run distribution? | Complete |
 
 ## 6. Reproducing the Study
 
@@ -245,7 +468,8 @@ Reference values are machine- and workload-specific. Timing alone does not prove
 
 - Python 3.13 or 3.14
 - [`uv`](https://docs.astral.sh/uv/) for environment and dependency management
-- Linux and `perf` only for Experiment 08 hardware counters
+- Linux and `perf` for Experiments 08 and 23 hardware counters
+- PyPy for the cross-runtime portion of Experiment 21
 
 ### Setup
 
@@ -254,6 +478,9 @@ git clone <repository-url>
 cd Python_Exp
 uv sync
 ```
+
+`uv sync` installs both runtime and development dependencies from `uv.lock`.
+The project currently targets Python 3.13 and 3.14.
 
 ### Run an experiment
 
@@ -267,12 +494,26 @@ Most benchmarks also provide a smaller smoke-test configuration:
 uv run python experiments/exp07_vectorization_vs_python_loops/benchmark.py --quick
 ```
 
+Use an experiment's `--help` output to inspect its available parameters:
+
+```bash
+uv run python experiments/exp19_garbage_collection_overhead/benchmark.py --help
+```
+
 ### Verify the repository
 
 ```bash
 uv run pytest
 uv run ruff check .
 uv run mypy experiments
+```
+
+The current experiment modules share repeated filenames such as
+`benchmark.py`. If a local mypy configuration reports duplicate module names,
+run it with explicit package bases:
+
+```bash
+uv run mypy --explicit-package-bases experiments
 ```
 
 Generated measurements and figures belong to their experiment directories. Consult the experiment README before comparing values across machines.
@@ -289,12 +530,15 @@ The appropriate conclusion is therefore not that one fixed speedup applies every
 
 ```text
 Python_Exp/
+├── README.md
+├── pyproject.toml
+├── uv.lock
 ├── experiments/
 │   ├── exp01_list_traversal/
 │   ├── ...
-│   └── exp18_transpose_cost/
+│   └── exp25_cpu_warmup_frequency_scaling/
 ├── tests/
-└── pyproject.toml
+└── src/
 ```
 
 ## 9. Current Conclusion
@@ -303,11 +547,36 @@ The experiments completed so far support a layered view of Python performance:
 
 <div align="center">
 
-**Python runtime and GIL → data representation → memory access pattern → hardware behavior**
+**Workload → Python runtime → data representation → memory access → parallel runtime → hardware**
 
 </div>
 
-Optimizing only the visible loop can miss the actual bottleneck. Pure Python code may be interpreter- or GIL-bound; compiled code may become locality-bound; contiguous bulk operations may become bandwidth-bound. Threads help when work waits or releases the GIL: they did not parallelize the measured pure-Python CPU loop, but four threads achieved 3.50× speedup when independent NumPy `sin` kernels released the GIL. Native BLAS threading also used several cores, although eight BLAS threads produced only 3.06× speedup. Combining Python and BLAS parallelism helped only until the CPU saturated: the 8×8 condition was slower than 8×4 and produced substantially more context switches. Separate processes parallelized pure-Python CPU work, although small tasks could not recover process lifecycle costs and eight-worker efficiency fell to 49.7% in the fixed-work scaling experiment. Array ownership matters as well: a 32 MiB copy duplicated the payload, while equivalent views shared it through sub-kilobyte metadata. Experiment 18 further showed that `.T` itself is metadata-only and that paying to materialize a contiguous transpose must be justified by the actual downstream kernel, not strides alone. Reliable performance work therefore requires controlled measurement, explicit control of every active worker pool, correctness and ownership checks, and conclusions limited to the evidence collected.
+Optimizing only the visible loop can miss the actual bottleneck. Pure Python
+code may be interpreter- or GIL-bound; compiled code may become
+locality-bound; contiguous bulk operations may become bandwidth-bound.
+
+Threads helped when work waited or released the GIL, but did not parallelize
+the measured pure-Python CPU loop. Separate processes enabled CPU parallelism,
+although small tasks could not recover process lifecycle costs. Native NumPy
+and BLAS kernels used multiple cores, while nested Python and BLAS pools
+eventually oversubscribed the CPU.
+
+Data ownership and lifetime were equally important. Views avoided
+payload-sized allocation but could preserve unfavorable strides. A transpose
+was cheap metadata, while materializing it copied the complete payload.
+Disabling cyclic GC made one allocation phase only 2.8% faster while increasing
+traced peak memory by roughly 37×. A million boxed Python integers required
+about 4.5× the accounted memory of an `int64` ndarray.
+
+Finally, the measurement process affected what could responsibly be claimed.
+More samples narrowed estimated uncertainty, the first CPU run differed from
+the warm distribution, absent PyPy prevented a runtime comparison, and
+false-sharing timing still required hardware-counter confirmation.
+
+Reliable performance work therefore requires a controlled question,
+equivalent work, correctness checks, explicit ownership and worker-pool
+information, raw samples, environment metadata, and conclusions limited to the
+evidence actually collected.
 
 ---
 

@@ -7,7 +7,6 @@ experiments/*/results/*.csv
 experiments/*/results/*.json
 experiments/*/figures/.matplotlib-cache/
 
-experiments/exp20_cpython_object_overhead/
 experiments/exp21_pypy_vs_cpython/
 experiments/exp22_async_io_vs_threading/
 experiments/exp23_false_sharing/

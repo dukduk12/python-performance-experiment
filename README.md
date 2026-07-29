@@ -160,10 +160,17 @@ only a small metadata object, shares the original storage, and may defer costs
 to later operations.
 
 CPython primarily uses reference counting, supplemented by a cyclic garbage
-collector. Reference counting can immediately reclaim most objects but cannot
+collector[^gfg-gc]. Reference counting can immediately reclaim most objects but cannot
 alone reclaim unreachable reference cycles. Disabling cyclic GC can remove
 collection work from a measured region, while allowing cyclic garbage and
 memory use to accumulate until a later explicit collection.
+
+[^gfg-gc]: GeeksforGeeks, *Garbage Collection in Python*.
+    Explains Python's garbage collection mechanism, including reference
+    counting, cyclic garbage collection, the `gc` module, and common examples.
+    Available at:
+    https://www.geeksforgeeks.org/python/garbage-collection-python/
+    (accessed July 29, 2026).
 
 ### 1.7 Basic Benchmark Terms
 

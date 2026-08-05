@@ -7,5 +7,4 @@ experiments/*/results/*.csv
 experiments/*/results/*.json
 experiments/*/figures/.matplotlib-cache/
 
-experiments/exp24_benchmark_stability/
 experiments/exp25_cpu_warmup_frequency_scaling/

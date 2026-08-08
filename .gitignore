@@ -6,5 +6,3 @@ __pycache__/
 experiments/*/results/*.csv
 experiments/*/results/*.json
 experiments/*/figures/.matplotlib-cache/
-
-experiments/exp25_cpu_warmup_frequency_scaling/

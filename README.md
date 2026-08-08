@@ -38,6 +38,16 @@
   </tr>
 </table>
 
+<p align="center">
+  <a href="#5-experiment-index"><strong>Browse experiments</strong></a>
+  ·
+  <a href="#6-reproducing-the-study"><strong>Reproduce results</strong></a>
+  ·
+  <a href="#4-principal-findings"><strong>Read the findings</strong></a>
+  ·
+  <a href="experiments/exp25_cpu_warmup_frequency_scaling/README.md"><strong>Latest: Experiment 25</strong></a>
+</p>
+
 ## What This Repository Is
 
 Python performance is not determined by syntax alone. It emerges from several interacting layers: CPython interpreter overhead, object representation, array layout, compiled numerical kernels, CPU caches, and memory bandwidth.
@@ -429,8 +439,8 @@ platform-specific command.
     </tr>
     <tr>
       <td><strong>The first CPU run differed from the warm distribution</strong></td>
-      <td>The first run was 1.051× slower than the warm-run median in Experiment 25.</td>
-      <td>Cold state and system dynamics should be measured before choosing a warm-up policy.</td>
+      <td>The first run was 1.051× slower than the later-run median; the 29 later runs still had a 2.55% CV in Experiment 25.</td>
+      <td>Inspect the complete sequence before choosing a warm-up policy; one discarded run does not guarantee stationarity.</td>
     </tr>
   </tbody>
 </table>
@@ -467,7 +477,7 @@ Reference values are machine- and workload-specific. Timing alone does not prove
 | 22 | [Async I/O vs Threading](experiments/exp22_async_io_vs_threading/README.md) | How do threads and asyncio overlap I/O waiting? | Complete |
 | 23 | [False Sharing](experiments/exp23_false_sharing/README.md) | Does cache-line separation improve concurrent shared-memory writes? | Timing complete; Linux counters pending |
 | 24 | [Benchmark Stability](experiments/exp24_benchmark_stability/README.md) | How do sample count and execution order affect result stability? | Complete |
-| 25 | [CPU Warm-up and Frequency Scaling](experiments/exp25_cpu_warmup_frequency_scaling/README.md) | How does the first run differ from the warm-run distribution? | Complete |
+| 25 | [CPU Warm-up and Frequency Scaling](experiments/exp25_cpu_warmup_frequency_scaling/README.md) | How does the first run differ from the later-run distribution, and what can frequency samples support? | Reference sequence complete |
 
 ## 6. Reproducing the Study
 
@@ -501,6 +511,16 @@ Most benchmarks also provide a smaller smoke-test configuration:
 uv run python experiments/exp07_vectorization_vs_python_loops/benchmark.py --quick
 ```
 
+To reproduce the latest cold-to-warm sequence:
+
+```bash
+uv run python experiments/exp25_cpu_warmup_frequency_scaling/benchmark.py
+```
+
+Benchmark commands replace that experiment's checked-in result files and
+figure with measurements from the current machine. Use `--quick` for a
+pipeline check, not for comparison with the documented reference values.
+
 Use an experiment's `--help` output to inspect its available parameters:
 
 ```bash
@@ -523,7 +543,9 @@ run it with explicit package bases:
 uv run mypy --explicit-package-bases experiments
 ```
 
-Generated measurements and figures belong to their experiment directories. Consult the experiment README before comparing values across machines.
+Generated measurements and figures belong to their experiment directories.
+Consult the experiment README for its exact workload, controls, output schema,
+and interpretation limits before comparing values across machines.
 
 ## 7. Interpretation and Limitations
 
@@ -576,9 +598,11 @@ traced peak memory by roughly 37×. A million boxed Python integers required
 about 4.5× the accounted memory of an `int64` ndarray.
 
 Finally, the measurement process affected what could responsibly be claimed.
-More samples narrowed estimated uncertainty, the first CPU run differed from
-the warm distribution, absent PyPy prevented a runtime comparison, and
-false-sharing timing still required hardware-counter confirmation.
+More samples narrowed estimated uncertainty. The first CPU run was 5.1% slower
+than the later-run median, but those later runs still varied and the sparse
+frequency samples did not establish a cause. Absent PyPy prevented a runtime
+comparison, and false-sharing timing still required hardware-counter
+confirmation.
 
 Reliable performance work therefore requires a controlled question,
 equivalent work, correctness checks, explicit ownership and worker-pool

@@ -44,11 +44,9 @@
   <a href="#6-reproducing-the-study"><strong>Reproduce results</strong></a>
   ·
   <a href="#4-principal-findings"><strong>Read the findings</strong></a>
-  ·
-  <a href="experiments/exp25_cpu_warmup_frequency_scaling/README.md"><strong>Latest: Experiment 25</strong></a>
 </p>
 
-## What This Repository Is
+## Overview
 
 Python performance is not determined by syntax alone. It emerges from several interacting layers: CPython interpreter overhead, object representation, array layout, compiled numerical kernels, CPU caches, and memory bandwidth.
 
@@ -460,7 +458,7 @@ Reference values are machine- and workload-specific. Timing alone does not prove
 | 05 | [Data Type and Element Size](experiments/exp05_data_type_element_size/README.md) | How does element width affect memory use and throughput? | Complete |
 | 06 | [Contiguous vs Non-Contiguous Arrays](experiments/exp06_contiguous_vs_non_contiguous/README.md) | What cost do slices and transposed views impose later? | Complete |
 | 07 | [Vectorization vs Python Loops](experiments/exp07_vectorization_vs_python_loops/README.md) | How much interpreter overhead does vectorization remove? | Complete |
-| 08 | [Cache Miss Measurement](experiments/exp08_cache_miss_measurement/README.md) | Do runtime differences coincide with cache miss behavior? | Awaiting Linux measurement |
+| 08 | [Cache Miss Measurement](experiments/exp08_cache_miss_measurement/README.md) | Do runtime differences coincide with cache miss behavior? | Partial — Linux measurement pending |
 | 09 | [Sequential vs Threading](experiments/exp09_sequential_vs_threading/README.md) | Why do more threads not accelerate CPU-bound Python work? | Complete |
 | 10 | [Sequential vs Multiprocessing](experiments/exp10_sequential_vs_multiprocessing/README.md) | When do processes accelerate CPU-bound Python work? | Complete |
 | 11 | [Task Size and Process Overhead](experiments/exp11_task_size_process_overhead/README.md) | When does useful computation outweigh process overhead? | Complete |
@@ -473,11 +471,11 @@ Reference values are machine- and workload-specific. Timing alone does not prove
 | 18 | [Transpose Cost](experiments/exp18_transpose_cost/README.md) | How do transpose creation and later traversal costs differ? | Complete |
 | 19 | [Garbage Collection Overhead](experiments/exp19_garbage_collection_overhead/README.md) | What time and memory trade-off does cyclic collection create? | Complete |
 | 20 | [CPython Object Overhead](experiments/exp20_cpython_object_overhead/README.md) | How different are the memory costs of boxed Python and fixed-width NumPy integers? | Complete |
-| 21 | [PyPy vs CPython](experiments/exp21_pypy_vs_cpython/README.md) | How do interpreter choice and JIT warm-up affect loop performance? | Harness complete; PyPy measurement pending |
+| 21 | [PyPy vs CPython](experiments/exp21_pypy_vs_cpython/README.md) | How do interpreter choice and JIT warm-up affect loop performance? | Partial — PyPy measurement pending |
 | 22 | [Async I/O vs Threading](experiments/exp22_async_io_vs_threading/README.md) | How do threads and asyncio overlap I/O waiting? | Complete |
-| 23 | [False Sharing](experiments/exp23_false_sharing/README.md) | Does cache-line separation improve concurrent shared-memory writes? | Timing complete; Linux counters pending |
+| 23 | [False Sharing](experiments/exp23_false_sharing/README.md) | Does cache-line separation improve concurrent shared-memory writes? | Partial — Linux counters pending |
 | 24 | [Benchmark Stability](experiments/exp24_benchmark_stability/README.md) | How do sample count and execution order affect result stability? | Complete |
-| 25 | [CPU Warm-up and Frequency Scaling](experiments/exp25_cpu_warmup_frequency_scaling/README.md) | How does the first run differ from the later-run distribution, and what can frequency samples support? | Reference sequence complete |
+| 25 | [CPU Warm-up and Frequency Scaling](experiments/exp25_cpu_warmup_frequency_scaling/README.md) | How does the first run differ from the later-run distribution, and what can frequency samples support? | Complete |
 
 ## 6. Reproducing the Study
 
@@ -593,7 +591,7 @@ eventually oversubscribed the CPU.
 Data ownership and lifetime were equally important. Views avoided
 payload-sized allocation but could preserve unfavorable strides. A transpose
 was cheap metadata, while materializing it copied the complete payload.
-Disabling cyclic GC made one allocation phase only 2.8% faster while increasing
+Disabling cyclic GC made one allocation phase only 3% faster while increasing
 traced peak memory by roughly 37×. A million boxed Python integers required
 about 4.5× the accounted memory of an `int64` ndarray.
 

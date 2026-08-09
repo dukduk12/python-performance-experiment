@@ -89,7 +89,16 @@ Row-first traversal is expected to have a lower cache miss rate and a shorter ex
 
 ### 9. Results
 
-No hardware-counter results are committed yet because the current development environment is Windows. Run the benchmark on Linux to generate `raw.csv`, `summary.csv`, and `metadata.json`, then record the measured values here.
+As of August 9, 2026, a rerun was attempted on a Linux host with:
+
+- CPU: Intel Core i5-7500 (4 cores)
+- `perf` version: 7.0.12
+- Kernel policy: `perf_event_paranoid=4`
+
+The benchmark itself started correctly, but `perf stat` could not access the
+requested `cache-references` and `cache-misses` events under that policy. No
+usable `raw.csv`, `summary.csv`, or `metadata.json` were produced for this
+experiment in the current Linux session.
 
 ### 10. Discussion
 
@@ -99,7 +108,10 @@ The whole-process counter scope must also be considered because it includes comm
 
 ### 11. Conclusion
 
-A conclusion should be written only after collecting hardware counters on a documented Linux system. The experiment is designed to determine whether poorer traversal locality, higher cache miss activity, and longer execution time appear together under controlled conditions.
+A performance-counter conclusion still requires a Linux host where `perf` event
+access is enabled for the current user or session. The experiment design is
+ready, but the August 9, 2026 Linux attempt remained blocked by kernel
+permissions rather than by benchmark logic.
 
 ### 12. Threats to Validity and Future Work
 
@@ -194,7 +206,16 @@ Numba compilation, Python startup, 배열 할당과 warmup은 순회 시간에�
 
 ### 9. 결과
 
-현재 개발 환경이 Windows이므로 hardware counter 실측 결과는 아직 기록하지 않았다. Linux에서 benchmark를 실행해 `raw.csv`, `summary.csv`, `metadata.json`을 생성한 뒤 측정값을 이 절에 기록한다.
+2026년 8월 9일 기준으로 다음 Linux 호스트에서 재실행을 시도했다.
+
+- CPU: Intel Core i5-7500 (4코어)
+- `perf` 버전: 7.0.12
+- 커널 정책: `perf_event_paranoid=4`
+
+Benchmark 자체는 정상 시작했지만, 해당 정책 때문에 `perf stat`가
+`cache-references`, `cache-misses` event에 접근하지 못했다. 따라서 이번
+Linux 세션에서는 이 실험의 `raw.csv`, `summary.csv`, `metadata.json`이
+생성되지 않았다.
 
 ### 10. 논의
 
@@ -204,7 +225,9 @@ Numba compilation, Python startup, 배열 할당과 warmup은 순회 시간에�
 
 ### 11. 결론
 
-문서화된 Linux 환경에서 hardware counter를 수집한 뒤에 결론을 작성한다. 이 실험은 통제된 조건에서 낮은 순회 지역성, 높은 cache miss 활동과 긴 실행 시간이 함께 나타나는지 확인하도록 설계되었다.
+성능 counter에 근거한 결론은 현재 사용자 또는 세션에서 `perf` event 접근이
+허용된 Linux 호스트가 있어야 쓸 수 있다. 이번 2026년 8월 9일 Linux 시도는
+benchmark 로직 문제가 아니라 커널 권한 정책 때문에 막혔다.
 
 ### 12. 타당성 위협과 향후 작업
 

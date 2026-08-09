@@ -417,7 +417,7 @@ platform-specific command.
     </tr>
     <tr>
       <td><strong>Runtime comparisons require both runtimes</strong></td>
-      <td>Experiment 21 recorded a 0.2637 s CPython median, but PyPy was unavailable on the reference host.</td>
+      <td>On the August 9, 2026 Linux host, Experiment 21 recorded a 0.3223 s CPython median, but PyPy was unavailable there as well.</td>
       <td>The harness reports missing runtime coverage instead of turning a one-runtime measurement into a cross-runtime claim.</td>
     </tr>
     <tr>
@@ -426,9 +426,9 @@ platform-specific command.
       <td>Both models overlapped waiting; asyncio scheduled all waits without limiting concurrency to a 20-worker pool.</td>
     </tr>
     <tr>
-      <td><strong>Separating shared writes improved the observed timing</strong></td>
-      <td>Cache-line-separated slots were 1.34× faster than adjacent slots in Experiment 23.</td>
-      <td>The result is consistent with reduced coherence contention, but Linux hardware counters are still needed for stronger attribution.</td>
+      <td><strong>False-sharing timing remained setup-sensitive</strong></td>
+      <td>On the August 9, 2026 Linux host, Experiment 23 measured the separated layout at 0.1256 s versus 0.1099 s for adjacent slots, so spacing was 0.88× as fast rather than faster.</td>
+      <td>The direction changed across hosts, which reinforces that wall-time evidence alone is not enough; affinity control and Linux hardware counters are still needed for attribution.</td>
     </tr>
     <tr>
       <td><strong>Larger samples narrowed estimated uncertainty</strong></td>
@@ -444,7 +444,7 @@ platform-specific command.
 </table>
 
 <sub>
-Reference values are machine- and workload-specific. Timing alone does not prove a cache mechanism; Experiment 08 is designed to add hardware-counter evidence.
+Reference values are machine- and workload-specific. Timing alone does not prove a cache mechanism; Experiment 08 is designed to add hardware-counter evidence, but on the August 9, 2026 Linux host `perf` access was blocked by `perf_event_paranoid=4`.
 </sub>
 
 ## 5. Experiment Index
@@ -458,7 +458,7 @@ Reference values are machine- and workload-specific. Timing alone does not prove
 | 05 | [Data Type and Element Size](experiments/exp05_data_type_element_size/README.md) | How does element width affect memory use and throughput? | Complete |
 | 06 | [Contiguous vs Non-Contiguous Arrays](experiments/exp06_contiguous_vs_non_contiguous/README.md) | What cost do slices and transposed views impose later? | Complete |
 | 07 | [Vectorization vs Python Loops](experiments/exp07_vectorization_vs_python_loops/README.md) | How much interpreter overhead does vectorization remove? | Complete |
-| 08 | [Cache Miss Measurement](experiments/exp08_cache_miss_measurement/README.md) | Do runtime differences coincide with cache miss behavior? | Partial — Linux measurement pending |
+| 08 | [Cache Miss Measurement](experiments/exp08_cache_miss_measurement/README.md) | Do runtime differences coincide with cache miss behavior? | Partial — Linux `perf` blocked by permissions |
 | 09 | [Sequential vs Threading](experiments/exp09_sequential_vs_threading/README.md) | Why do more threads not accelerate CPU-bound Python work? | Complete |
 | 10 | [Sequential vs Multiprocessing](experiments/exp10_sequential_vs_multiprocessing/README.md) | When do processes accelerate CPU-bound Python work? | Complete |
 | 11 | [Task Size and Process Overhead](experiments/exp11_task_size_process_overhead/README.md) | When does useful computation outweigh process overhead? | Complete |
@@ -471,9 +471,9 @@ Reference values are machine- and workload-specific. Timing alone does not prove
 | 18 | [Transpose Cost](experiments/exp18_transpose_cost/README.md) | How do transpose creation and later traversal costs differ? | Complete |
 | 19 | [Garbage Collection Overhead](experiments/exp19_garbage_collection_overhead/README.md) | What time and memory trade-off does cyclic collection create? | Complete |
 | 20 | [CPython Object Overhead](experiments/exp20_cpython_object_overhead/README.md) | How different are the memory costs of boxed Python and fixed-width NumPy integers? | Complete |
-| 21 | [PyPy vs CPython](experiments/exp21_pypy_vs_cpython/README.md) | How do interpreter choice and JIT warm-up affect loop performance? | Partial — PyPy measurement pending |
+| 21 | [PyPy vs CPython](experiments/exp21_pypy_vs_cpython/README.md) | How do interpreter choice and JIT warm-up affect loop performance? | Partial — Linux CPython only; PyPy unavailable |
 | 22 | [Async I/O vs Threading](experiments/exp22_async_io_vs_threading/README.md) | How do threads and asyncio overlap I/O waiting? | Complete |
-| 23 | [False Sharing](experiments/exp23_false_sharing/README.md) | Does cache-line separation improve concurrent shared-memory writes? | Partial — Linux counters pending |
+| 23 | [False Sharing](experiments/exp23_false_sharing/README.md) | Does cache-line separation improve concurrent shared-memory writes? | Complete |
 | 24 | [Benchmark Stability](experiments/exp24_benchmark_stability/README.md) | How do sample count and execution order affect result stability? | Complete |
 | 25 | [CPU Warm-up and Frequency Scaling](experiments/exp25_cpu_warmup_frequency_scaling/README.md) | How does the first run differ from the later-run distribution, and what can frequency samples support? | Complete |
 
@@ -483,7 +483,7 @@ Reference values are machine- and workload-specific. Timing alone does not prove
 
 - Python 3.13 or 3.14
 - [`uv`](https://docs.astral.sh/uv/) for environment and dependency management
-- Linux and `perf` for Experiments 08 and 23 hardware counters
+- Linux, `perf`, and a permissive `perf_event_paranoid` policy for Experiments 08 and 23 hardware counters
 - PyPy for the cross-runtime portion of Experiment 21
 
 ### Setup
@@ -599,8 +599,11 @@ Finally, the measurement process affected what could responsibly be claimed.
 More samples narrowed estimated uncertainty. The first CPU run was 5.1% slower
 than the later-run median, but those later runs still varied and the sparse
 frequency samples did not establish a cause. Absent PyPy prevented a runtime
-comparison, and false-sharing timing still required hardware-counter
-confirmation.
+comparison on the August 9, 2026 Linux host, `perf_event_paranoid=4` blocked
+Experiment 08 hardware counters there, and the Linux false-sharing timing
+changed direction relative to the earlier Windows run. Those gaps are exactly
+why the repository treats platform, permissions, and measurement scope as part
+of the evidence rather than as incidental setup details.
 
 Reliable performance work therefore requires a controlled question,
 equivalent work, correctness checks, explicit ownership and worker-pool

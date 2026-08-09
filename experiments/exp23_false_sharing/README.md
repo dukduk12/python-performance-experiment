@@ -2,10 +2,11 @@
 
 [English](#english) · [한국어](#한국어)
 
-> **Key finding:** in the checked-in Windows run, placing each worker's shared
-> integer 128 bytes apart reduced the median elapsed time from **0.4004 s** to
-> **0.2994 s**—a **1.34× speedup**. This is consistent with reduced cache-line
-> contention, but timing alone does not prove that false sharing caused the gap.
+> **Key finding:** the checked-in Windows run favored the separated layout
+> (**0.2994 s** versus **0.4004 s**, a **1.34× speedup**), but a Linux rerun on
+> August 9, 2026 measured the separated layout as slower (**0.1256 s** versus
+> **0.1099 s**, or **0.88×** the adjacent speed). Timing alone is therefore not
+> enough to attribute the gap to false sharing without tighter controls.
 
 ![Adjacent and separated shared-memory write times](figures/false_sharing.png)
 
@@ -74,10 +75,11 @@ overhead dominates the measurement.
 | Shared storage | `multiprocessing.RawArray("q", ...)` | Lock-free shared allocation |
 | Timer | `time.perf_counter_ns()` | Wall-clock elapsed time |
 
-For each repeat, the benchmark runs `adjacent` and then `separated`. A fresh
-shared array and fresh processes are created for every condition. Timing starts
-before `Process.start()` and ends after every `Process.join()`, so process
-startup, scheduling, worker execution, and teardown are all included.
+For each repeat, the benchmark randomizes the condition order with a fixed
+seed. A fresh shared array and fresh processes are created for every condition.
+Timing starts before `Process.start()` and ends after every `Process.join()`,
+so process startup, scheduling, worker execution, and teardown are all
+included.
 
 Each worker executes the equivalent of:
 
@@ -135,6 +137,14 @@ uv run python experiments/exp23_false_sharing/benchmark.py \
   --repeats 10
 ```
 
+Run one layout only. This is useful when collecting per-layout Linux `perf`
+counters in separate commands:
+
+```bash
+uv run python experiments/exp23_false_sharing/benchmark.py --condition adjacent
+uv run python experiments/exp23_false_sharing/benchmark.py --condition separated
+```
+
 Write tabular results and metadata to another directory:
 
 ```bash
@@ -144,8 +154,7 @@ uv run python experiments/exp23_false_sharing/benchmark.py \
 
 The plot is always written to this experiment's `figures/` directory, even
 when `--output-dir` is set. Re-running the benchmark overwrites existing output
-files. Use positive values for all numeric arguments; the current CLI does not
-validate invalid or zero values explicitly.
+files. All numeric CLI arguments must be positive.
 
 For less noisy measurements, close CPU-intensive applications, use a stable
 power profile, and run several independent benchmark sessions. Do not compare
@@ -175,19 +184,30 @@ These results support the hypothesis on the reference machine. They do not
 establish a universal speedup or isolate cache coherence as the only causal
 mechanism.
 
+Linux rerun on August 9, 2026:
+
+| Layout | Stride | Median (s) | Speedup vs adjacent |
+| --- | ---: | ---: | ---: |
+| Adjacent | 8 B | 0.109935888 | 1.00× |
+| Separated | 128 B | 0.125579626 | 0.88× |
+
+On that Linux host, the separated layout was **0.015643738 s slower** than the
+adjacent layout. This reversal does not prove that false sharing is absent; it
+shows that process startup, scheduling, affinity, cache placement, and other
+host-specific effects can dominate the wall-time result in this Python-level
+benchmark.
+
 ### Generated Artifacts
 
 The default output locations are:
 
 - `results/raw.csv`: one row per condition and repeat, including elapsed time,
-  layout, parameters, stride, and checksum;
-- `results/summary.csv`: median time and speedup for each layout;
-- `results/metadata.json`: platform, worker count, and a hardware-counter note;
+  layout, repeat number, randomized run order, parameters, stride, and
+  checksum;
+- `results/summary.csv`: median time, spread, and speedup for each layout;
+- `results/metadata.json`: timestamp, Python version, platform, start method,
+  selected conditions, benchmark parameters, and a hardware-counter note;
 - `figures/false_sharing.png`: median elapsed-time bar chart.
-
-The metadata currently omits the Python version, CPU model, cache-line size,
-start method, affinity, iteration and repeat counts, timestamp, and dependency
-versions. Keep those omissions in mind when archiving or comparing runs.
 
 ### Interpretation Guide
 
@@ -209,16 +229,17 @@ to collect available cache and coherence-related events for repeated runs:
 
 ```bash
 perf stat -r 7 -e cache-references,cache-misses \
-  uv run python experiments/exp23_false_sharing/benchmark.py
+  uv run python experiments/exp23_false_sharing/benchmark.py --condition adjacent
+
+perf stat -r 7 -e cache-references,cache-misses \
+  uv run python experiments/exp23_false_sharing/benchmark.py --condition separated
 ```
 
 Generic cache events are only a starting point and may not directly count
 cache-line ownership transfers. Event names and availability depend on the CPU
 and kernel. For stronger attribution, use architecture-specific HITM or
 cache-to-cache events, `perf c2c`, fixed CPU affinity, and a native tight loop
-that minimizes interpreter overhead. Benchmarking both conditions within one
-script also means aggregate counters cover both layouts; separate-condition
-execution would be needed for clean per-layout counter comparison.
+that minimizes interpreter overhead.
 
 ### Limitations and Threats to Validity
 
@@ -230,8 +251,8 @@ execution would be needed for clean per-layout counter comparison.
   overhead around every store.
 - Process creation and joining are inside the timed region and may dilute the
   memory-layout effect, especially for short runs.
-- Conditions always run in `adjacent → separated` order, so warm-up, thermal,
-  background-load, and scheduler effects can correlate with layout.
+- Condition order is randomized, but warm-up, thermal behavior, background
+  load, and scheduler effects can still correlate with one layout by chance.
 - Only wall time is recorded. There are no confidence intervals, CPU-time,
   context-switch, migration, cache-miss, or coherence measurements.
 - The checksum verifies only final values and cannot count intermediate stores.
@@ -244,17 +265,17 @@ execution would be needed for clean per-layout counter comparison.
 
 Experiment 23 demonstrates that memory layout can affect parallel performance
 even when workers modify logically independent values. On the reference run,
-128-byte spacing was 1.34× faster than adjacent 8-byte slots. The result is a
-useful timing demonstration of probable false sharing, while definitive causal
-attribution requires CPU placement control and hardware coherence counters.
+128-byte spacing was 1.34× faster than adjacent 8-byte slots, while the August
+9, 2026 Linux rerun favored adjacent slots instead. The experiment is still a
+useful timing demonstration, but the cross-host reversal makes the need for
+CPU placement control and hardware coherence counters even clearer.
 
 ### Future Work
 
 - Pin each worker to a distinct physical core and record the mapping.
 - Allocate cache-line-aligned storage and detect the host cache-line size.
 - Move the hot write loop to C, Cython, Numba, or a small native extension.
-- Run each layout independently under `perf stat` and `perf c2c`.
-- Randomize or counterbalance condition order and add confidence intervals.
+- Add confidence intervals and compare more independent benchmark sessions.
 - Sweep stride, worker count, write count, and physical versus logical cores.
 - Record CPU, Python, start method, affinity, cache topology, and full run
   configuration in metadata.
@@ -300,7 +321,7 @@ workload의 실행 시간이 감소하는가?
 | 공유 메모리 | `multiprocessing.RawArray("q", ...)` | lock 없는 공유 배열 |
 | Timer | `time.perf_counter_ns()` | wall-clock 시간 |
 
-매 반복마다 `adjacent → separated` 순서로 실행하며, 조건마다 공유 배열과
+매 반복마다 고정 seed로 조건 순서를 무작위화하며, 조건마다 공유 배열과
 프로세스를 새로 만든다. 측정 구간에는 `Process.start()`부터 모든
 `Process.join()`이 끝날 때까지가 포함되므로 프로세스 시작·스케줄링·종료
 비용도 결과에 들어간다.
@@ -349,9 +370,17 @@ uv run python experiments/exp23_false_sharing/benchmark.py \
   --output-dir tmp/exp23-results
 ```
 
+한 조건만 단독 실행할 수도 있다. Linux `perf`에서 조건별 counter를 분리해
+수집할 때 유용하다.
+
+```bash
+uv run python experiments/exp23_false_sharing/benchmark.py --condition adjacent
+uv run python experiments/exp23_false_sharing/benchmark.py --condition separated
+```
+
 `--output-dir`은 CSV와 metadata 위치만 바꾼다. 그래프는 항상 실험 폴더의
 `figures/false_sharing.png`에 저장되며, 재실행 시 기존 산출물을 덮어쓴다.
-현재 CLI는 0이나 음수 인자를 명시적으로 검증하지 않으므로 양수만 사용한다.
+모든 숫자 CLI 인자는 양수여야 한다.
 
 ### 기준 결과
 
@@ -375,16 +404,26 @@ uv run python experiments/exp23_false_sharing/benchmark.py \
 재현된다는 뜻은 아니다. 또한 시간 차이만으로 cache coherence가 유일한
 원인이라고 단정할 수 없다.
 
+2026년 8월 9일 Linux 재실행:
+
+| 배치 | Stride | 중앙값 (초) | 인접 배치 대비 속도 |
+| --- | ---: | ---: | ---: |
+| 인접 | 8 B | 0.109935888 | 1.00× |
+| 분리 | 128 B | 0.125579626 | 0.88× |
+
+이 Linux 호스트에서는 분리 배치가 인접 배치보다 **0.015643738초** 더 느렸다.
+이 반전이 false sharing이 없다는 뜻은 아니다. 이 Python 수준 benchmark에서는
+프로세스 시작 비용, 스케줄링, affinity, cache 배치 같은 host별 요소가 wall
+time을 더 크게 좌우할 수 있다는 뜻이다.
+
 ### 생성 파일
 
-- `results/raw.csv`: 조건·반복별 시간, parameter, stride, checksum
-- `results/summary.csv`: 배치별 중앙값과 인접 배치 대비 speedup
-- `results/metadata.json`: platform, worker 수, hardware counter 안내
+- `results/raw.csv`: 조건·반복별 시간, parameter, stride, checksum, 반복 번호,
+  무작위 실행 순서
+- `results/summary.csv`: 배치별 중앙값, 분산 정보와 인접 배치 대비 speedup
+- `results/metadata.json`: 실행 시각, Python 버전, platform, start method,
+  선택 조건, benchmark parameter와 hardware counter 안내
 - `figures/false_sharing.png`: 중앙 실행 시간 비교 그래프
-
-현재 metadata에는 Python/CPU 버전, cache-line 크기, start method, affinity,
-iteration·repeat 수, 실행 시각, 의존성 버전이 없다. 결과를 장기 보관하거나
-다른 장비와 비교할 때는 이 정보를 별도로 기록하는 것이 좋다.
 
 ### 결과 해석 시 주의점
 
@@ -401,8 +440,8 @@ iteration·repeat 수, 실행 시각, 의존성 버전이 없다. 결과를 장�
 
 - CPU affinity를 고정하지 않아 worker가 같은 core를 쓰거나 이동할 수 있다.
 - 프로세스 생성과 종료 시간이 측정 구간에 포함된다.
-- 조건 순서가 항상 인접 배치 후 분리 배치라 warm-up, 온도, background load가
-  특정 조건과 연관될 수 있다.
+- 조건 순서는 무작위화하지만 warm-up, 온도, background load, scheduler 영향이
+  우연히 특정 조건과 연관될 수 있다.
 - Python/ctypes overhead가 각 공유 메모리 write에 포함된다.
 - Wall time만 수집하며 cache miss, HITM, context switch, migration은 측정하지 않는다.
 - 7회 반복과 단일 Windows 장비만으로 일반적인 성능 결론을 내릴 수 없다.
@@ -414,29 +453,30 @@ Linux에서는 우선 다음과 같이 generic cache event를 수집할 수 있�
 
 ```bash
 perf stat -r 7 -e cache-references,cache-misses \
-  uv run python experiments/exp23_false_sharing/benchmark.py
+  uv run python experiments/exp23_false_sharing/benchmark.py --condition adjacent
+
+perf stat -r 7 -e cache-references,cache-misses \
+  uv run python experiments/exp23_false_sharing/benchmark.py --condition separated
 ```
 
 다만 generic cache miss만으로 cache line 소유권 이동을 직접 입증하기는 어렵다.
 CPU별 HITM/cache-to-cache event, `perf c2c`, core affinity, native hot loop를 함께
-사용해야 더 강한 근거를 얻을 수 있다. 현재 script 한 번에는 두 조건이 모두
-실행되므로 조건별 counter를 깨끗하게 비교하려면 조건을 따로 실행하는 기능도
-추가해야 한다.
+사용해야 더 강한 근거를 얻을 수 있다.
 
 ### 결론
 
 Experiment 23은 worker들이 논리적으로 독립된 값을 수정하더라도 메모리 배치가
-병렬 성능에 영향을 줄 수 있음을 보여준다. 기준 실행에서는 128바이트 분리
-배치가 8바이트 인접 배치보다 1.34× 빨랐다. 이는 false sharing을 설명하는
-유용한 timing 실험이며, 인과관계를 더 확실히 하려면 CPU 고정과 hardware
-coherence counter가 필요하다.
+병렬 성능에 영향을 줄 수 있음을 보여준다. 기준 Windows 실행에서는 128바이트
+분리 배치가 8바이트 인접 배치보다 1.34× 빨랐지만, 2026년 8월 9일 Linux
+재실행에서는 오히려 인접 배치가 더 빨랐다. 이 실험은 여전히 유용한 timing
+예시지만, host 간 방향이 뒤집혔다는 사실은 인과관계를 더 확실히 하려면 CPU
+고정과 hardware coherence counter가 필수라는 점을 더 강하게 보여준다.
 
 ### 향후 개선
 
 - Worker를 서로 다른 physical core에 고정하고 매핑 기록
 - Cache-line-aligned allocation과 실제 cache-line 크기 감지
 - Hot loop를 C, Cython, Numba 또는 native extension으로 이동
-- 조건별 `perf stat`·`perf c2c` 측정
-- 조건 순서 무작위화 또는 counterbalancing과 신뢰구간 추가
+- 신뢰구간과 독립 benchmark session 비교 추가
 - Stride, worker, write 수, physical/logical core sweep
 - CPU, Python, start method, affinity, cache topology를 metadata에 저장

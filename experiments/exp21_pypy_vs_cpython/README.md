@@ -2,9 +2,10 @@
 
 [English](#english) · [한국어](#한국어)
 
-> **Current status:** the benchmark harness is complete, but the reference host
-> did not have PyPy installed. The saved result therefore establishes a CPython
-> baseline only; it does **not** support a PyPy-versus-CPython speed claim.
+> **Current status:** the benchmark harness is complete. A second run on Linux
+> on August 9, 2026 again found no `pypy3`/`pypy` executable, so the saved
+> artifacts still establish a CPython baseline only; they do **not** support a
+> PyPy-versus-CPython speed claim.
 
 ---
 
@@ -179,6 +180,23 @@ sequence alone should not be interpreted as evidence of CPython warm-up, and no
 cross-runtime conclusion is possible until PyPy data is collected on the same
 host under the same conditions.
 
+Additional Linux rerun on August 9, 2026:
+
+- Platform: `Linux-7.0.0-28-generic-x86_64-with-glibc2.39`
+- CPython executable: `.venv/bin/python3`
+- PyPy available: no
+- Iterations per repeat: 2,000,000
+- Repeats: 7
+
+| Interpreter | Runs | First (s) | Median (s) | First / fastest |
+| --- | ---: | ---: | ---: | ---: |
+| CPython | 7 | 0.332060745 | 0.32231003 | 1.0389× |
+| PyPy | — | — | — | Not installed |
+
+This Linux rerun changed the absolute CPython timing but not the status of the
+research question: PyPy was still missing, so no cross-runtime claim can be
+made from the checked-in artifacts alone.
+
 ### Generated Artifacts
 
 The default destination is `experiments/exp21_pypy_vs_cpython/results/`.
@@ -232,9 +250,10 @@ defined post-warm-up window rather than silently dropping early measurements.
 
 Experiment 21 provides a small, reproducible harness for observing repeated
 pure-Python loop performance and potential JIT warm-up across CPython and PyPy.
-The checked-in data establishes a CPython median of `0.2636634 s` and a
-first-to-fastest ratio of `1.0619×`. Because PyPy was absent, the primary
-cross-runtime research question remains open.
+The checked-in Windows data establishes a CPython median of `0.2636634 s`, and
+the August 9, 2026 Linux rerun established `0.32231003 s` on that host. PyPy
+was absent in both environments, so the primary cross-runtime research
+question remains open.
 
 ### Future Work
 
@@ -414,6 +433,23 @@ Repository에 저장된 기준 환경:
 warm-up을 입증할 수는 없다. 또한 같은 host와 조건에서 PyPy를 측정하기 전에는
 runtime 사이의 성능 결론을 내릴 수 없다.
 
+2026년 8월 9일 Linux 재실행:
+
+- Platform: `Linux-7.0.0-28-generic-x86_64-with-glibc2.39`
+- CPython executable: `.venv/bin/python3`
+- PyPy 사용 가능 여부: 없음
+- 반복당 iteration: 2,000,000
+- Repeat: 7회
+
+| Interpreter | 실행 수 | 첫 실행 (초) | 중앙값 (초) | 첫 실행 / 최단 실행 |
+| --- | ---: | ---: | ---: | ---: |
+| CPython | 7 | 0.332060745 | 0.32231003 | 1.0389× |
+| PyPy | — | — | — | 미설치 |
+
+이 Linux 재실행은 CPython 절대 시간은 바꿨지만 연구 질문의 상태는 바꾸지
+못했다. PyPy가 여전히 없었기 때문에 저장된 산출물만으로는 runtime 간 비교
+주장을 만들 수 없다.
+
 ### 생성 파일
 
 기본 저장 위치는 `experiments/exp21_pypy_vs_cpython/results/`이다.
@@ -463,9 +499,10 @@ post-warm-up 구간을 별도로 보고해야 한다.
 ### 결론
 
 Experiment 21은 CPython과 PyPy에서 반복되는 순수 Python loop의 성능과 잠재적
-JIT warm-up을 관찰하기 위한 작고 재현 가능한 harness다. 현재 저장된 결과의
-CPython 중앙값은 `0.2636634초`, 첫 실행 대비 최단 실행 비율은 `1.0619×`다.
-PyPy가 설치되어 있지 않았으므로 핵심인 runtime 간 비교 질문은 아직 열려 있다.
+JIT warm-up을 관찰하기 위한 작고 재현 가능한 harness다. 저장된 Windows 결과의
+CPython 중앙값은 `0.2636634초`이고, 2026년 8월 9일 Linux 재실행에서는
+`0.32231003초`였다. 두 환경 모두 PyPy가 설치되어 있지 않았으므로 핵심인
+runtime 간 비교 질문은 아직 열려 있다.
 
 ### 향후 작업
 
